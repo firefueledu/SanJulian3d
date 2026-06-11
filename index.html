@@ -3093,6 +3093,9 @@ var marquee=(function(){
   },768,576);
   var sign=new THREE.Mesh(new THREE.PlaneGeometry(9.8,7.35),new THREE.MeshStandardMaterial({map:sT,roughness:0.9}));
   sign.position.set(8.42,5.4,-10); sign.rotation.y=-Math.PI/2; g.add(sign);
+  /* second sign painted high across the street-facing front of the building */
+  var sign2=new THREE.Mesh(new THREE.PlaneGeometry(8.6,6.45),new THREE.MeshStandardMaterial({map:sT,roughness:0.9}));
+  sign2.position.set(13.5,7.4,-2.92); g.add(sign2);
   /* sidewalk dressing in front of the wall: tents, cart, cone */
   function mTent(x,z,rot,col,sc){
     var t=new THREE.Mesh(new THREE.CylinderGeometry(0.02,1.15,1.5,4),new THREE.MeshStandardMaterial({color:col,roughness:0.85}));
