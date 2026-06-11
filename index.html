@@ -2763,6 +2763,10 @@ ptA.position.set(-8.6,6,-20);ptB.position.set(8.6,6,-70);
 addMover(ptA,120);addMover(ptB,120);
 
 /* underpass — comes around once per loop */
+/* red strobe wash under the working rig (makes lights read in daylight) */
+var rigGlow=new THREE.PointLight(0xff2a2a,0,16,2.0);
+rigGlow.position.set(-2.2,3.3,0.6);
+scene.add(rigGlow);
 var underpassG=(function(){
   var g=new THREE.Group();
   var deck=box(46,2.2,16,mat.concreteDark);deck.position.y=9.2;g.add(deck);
@@ -3497,9 +3501,13 @@ function frame(now){
 
   /* lightbar — alternating strobe while rolling, slow idle on scene, dark at quarters */
   var rolling=spd>0.5;
-  var rate2=rolling?7:2.2;
+  /* Code 3 for the whole run: responding, on scene with the patient, and
+     transporting all strobe at full rate. Lights only go dark back at
+     quarters or when the rig is out of service. */
+  var code3=(flow==='cruise'||flow==='approach'||flow==='onScene')&&!outOfService&&!(atQuarters&&!rolling);
+  var rate2=code3?7:2.2;
   var phase=Math.floor(elapsed*rate2)%2===0;
-  var dark=(atQuarters&&!rolling)||outOfService;
+  var dark=!code3;
   var L,R,li;
   if(flow==='bay'){
     for(var bk in FLEET){
@@ -3512,6 +3520,7 @@ function frame(now){
     for(li=0;li<L.length;li++)L[li].material=dark?FM.lensOff:(phase?FM.lensOn:FM.lensOff);
     for(li=0;li<R.length;li++)R[li].material=dark?FM.lensOff:(phase?FM.lensOff:FM.lensOn);
   }
+  rigGlow.intensity=dark||flow==='bay'||flow==='menu'?0:(phase?1.5:0.55)*(flow==='onScene'?1.4:1);
 
   /* camera: bay sweep at quarters, fixed chase framing on the trail */
   if(flow==='bay'){
