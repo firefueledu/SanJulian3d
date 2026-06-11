@@ -3105,6 +3105,54 @@ var marquee=(function(){
   cart.position.set(6.6,0,-0.6); cart.rotation.y=0.9; g.add(cart);
   var cone=FC(0.05,0.24,0.55,new THREE.MeshStandardMaterial({color:'#e07b39',roughness:0.7}),8,5.4,0.28,-3.4); g.add(cone);
   g.add(FB(0.4,0.06,0.4,new THREE.MeshStandardMaterial({color:'#e07b39',roughness:0.7}),5.4,0.03,-3.4));
+  /* more tents along both sidewalks */
+  mTent(6.9,-9.2,0.8,'#c46a3a',0.95); mTent(7.5,-11.6,-0.6,'#3f6a8a',1.1);
+  mTent(6.5,1.8,1.4,'#4f7a55',0.85);
+  mTent(-8.4,-10.5,0.3,'#6a86c2',1.0); mTent(-9.2,-13.2,-0.8,'#c46a3a',0.9);
+  var tarp=FB(2.2,0.9,1.6,new THREE.MeshStandardMaterial({color:'#6a86c2',roughness:0.9}),-8.9,0.45,-3.4);
+  tarp.rotation.y=0.4; g.add(tarp);
+  /* scattered trash: bags, cardboard, bottles, litter, an overflowing can */
+  var bagM=new THREE.MeshStandardMaterial({color:'#26262c',roughness:0.95});
+  var cbM=new THREE.MeshStandardMaterial({color:'#a98a5b',roughness:0.95});
+  var litM=new THREE.MeshStandardMaterial({color:'#d8d2c2',roughness:0.95});
+  function bag(x,z,s){var b=new THREE.Mesh(new THREE.SphereGeometry(0.28*(s||1),8,6),bagM);
+    b.scale.y=0.62;b.position.set(x,0.17*(s||1),z);g.add(b);}
+  function cb(x,z,r){var c2=FB(0.9,0.04,0.6,cbM,x,0.025,z);c2.rotation.y=r;g.add(c2);}
+  function bottle(x,z,r){var bt=FC(0.04,0.05,0.26,new THREE.MeshStandardMaterial({color:'#3f6a45',roughness:0.4}),6,x,0.05,z);
+    bt.rotation.z=Math.PI/2;bt.rotation.y=r;g.add(bt);}
+  function lit(x,z,r){var l2=FB(0.22,0.012,0.16,litM,x,0.012,z);l2.rotation.y=r;g.add(l2);}
+  bag(6.1,-1.4,1);bag(8.6,-8.2,0.8);bag(6.8,-7.6,1.1);bag(-8.1,-5.2,0.9);bag(5.9,-10.4,0.7);
+  cb(7.4,-5.6,0.5);cb(6.2,-3.1,1.8);cb(-8.5,-8.9,0.9);cb(8.3,-12.3,2.4);
+  bottle(5.7,-2.6,0.4);bottle(6.4,-6.2,1.7);bottle(-7.9,-7.1,2.6);
+  lit(5.5,-4.4,0.7);lit(6.9,-1.1,2.1);lit(-8.2,-2.4,1.2);lit(6.0,-8.9,0.2);lit(7.7,-10.7,2.9);lit(-8.8,-11.6,1.5);
+  var can=FC(0.32,0.28,0.85,new THREE.MeshStandardMaterial({color:'#3f5a4a',roughness:0.85}),10,5.9,0.43,0.6);g.add(can);
+  var canBag=new THREE.Mesh(new THREE.SphereGeometry(0.3,8,6),bagM);canBag.scale.y=0.7;canBag.position.set(5.9,0.95,0.6);g.add(canBag);
+  lit(5.5,0.9,0.9);lit(6.3,0.2,2.2);
+  /* ambient residents — slow, tired, human */
+  var peds=[];
+  function walker(lane,z0,z1,spd,ph){
+    var p=fig(civTop,civPant,pSkin,false);
+    p.position.set(lane,0,(z0+z1)/2);
+    g.add(p);
+    peds.push({g:p,z:(z0+z1)/2,z0:Math.max(z0,z1),z1:Math.min(z0,z1),spd:spd,dir:Math.random()<0.5?1:-1,ph:ph});
+    return p;
+  }
+  var w1=walker(6.0,1.5,-8.5,0.55,0);          /* carrying his bag, like the photo */
+  var hb=new THREE.Mesh(new THREE.SphereGeometry(0.2,8,6),bagM);
+  hb.scale.y=0.8;hb.position.set(0.36,0.62,0.12);w1.add(hb);
+  var w2=walker(-8.5,-1.5,-12.0,0.45,2.1);     /* pushing a cart */
+  var pc=new THREE.Group();
+  pc.add(FB(0.7,0.55,1.0,FM.silver,0,0.7,0));
+  pc.add(FB(0.65,0.3,0.9,new THREE.MeshStandardMaterial({color:'#3f6a8a',roughness:0.85}),0,1.12,0));
+  pc.position.set(0,0,0.75);w2.add(pc);
+  walker(9.6,-3.0,-12.5,0.5,4.2);              /* far lane, slow */
+  /* seated against the wall by the tents */
+  var sit=fig(civTop,civPant,pSkin,false);
+  sit.userData.legs.scale.y=0.4;sit.userData.legs.position.y=0.16;
+  sit.userData.torso.position.y=0.62;
+  sit.children.forEach(function(ch){if(ch.geometry&&ch.geometry.type==='SphereGeometry')ch.position.y=1.06;});
+  sit.position.set(8.1,0,-8.6);sit.rotation.y=-1.4;g.add(sit);
+  g.userData.peds=peds;
   /* street tree on the far sidewalk, like the photo */
   var trunk=FC(0.14,0.2,3.2,new THREE.MeshStandardMaterial({color:'#5a4632',roughness:0.95}),8,-8.8,1.6,-7); g.add(trunk);
   [[-8.8,4.2,-7,1.5],[-9.6,3.6,-6.4,1.1],[-8.0,3.7,-7.6,1.2]].forEach(function(p){
@@ -3229,6 +3277,21 @@ function frame(now){
     if(atQuarters&&parkIn<=0&&spd<0.4){ spd=0; setTag('AT QUARTERS'); }
   }else{
     unit.position.y*=0.9;
+  }
+
+  /* menu residents: slow ambling along the sidewalks */
+  if(flow==='menu'&&marquee.visible&&marquee.userData.peds){
+    var P=marquee.userData.peds;
+    for(var pi=0;pi<P.length;pi++){
+      var pd=P[pi];
+      pd.z+=pd.dir*pd.spd*dt;
+      if(pd.z<=pd.z1){pd.z=pd.z1;pd.dir=1;}
+      else if(pd.z>=pd.z0){pd.z=pd.z0;pd.dir=-1;}
+      pd.g.position.z=pd.z;
+      pd.g.rotation.y=pd.dir>0?0:Math.PI;
+      pd.g.position.y=Math.abs(Math.sin(elapsed*pd.spd*3.4+pd.ph))*0.04;
+      pd.g.rotation.z=Math.sin(elapsed*pd.spd*3.4+pd.ph)*0.03;
+    }
   }
 
   /* vignette: crew + patient react while we're on scene */
