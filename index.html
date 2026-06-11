@@ -2622,12 +2622,13 @@ function makeFacade(side){
   return g;
 }
 var FAC_N=13,FAC_SP=17,FAC_LOOP=FAC_N*FAC_SP;
-var rightFacades=[];
+var rightFacades=[],allFacades=[];
 [-1,1].forEach(function(side){
   for(var i=0;i<FAC_N;i++){
     var f=makeFacade(side);
     f.position.z=20-i*FAC_SP-(side>0?7:0);
     if(side>0) rightFacades.push(f);
+    allFacades.push(f);
     addMover(f,FAC_LOOP);
   }
 });
@@ -2676,12 +2677,12 @@ function makeProp(){
   return g;
 }
 var PROP_N=22,PROP_SP=10,PROP_LOOP=PROP_N*PROP_SP;
-var campProps=[];
+var campProps=[],rightProps=[];
 [-1,1].forEach(function(side){
   for(var i=0;i<PROP_N;i++){
     var p=makeProp();
     p.position.set(side*(8.6+Math.random()*1.4),0,18-i*PROP_SP-(side>0?5:0));
-    if(side>0)p.rotation.y=Math.PI;
+    if(side>0){p.rotation.y=Math.PI;rightProps.push(p);}
     if(p.userData.camp)campProps.push(p);
     addMover(p,PROP_LOOP);
   }
@@ -3054,7 +3055,8 @@ function enterBay(){
   flow='bay';
   resetVig();
   marquee.visible=false;
-  for(var fi=0;fi<rightFacades.length;fi++) rightFacades[fi].visible=true;
+  for(var fi=0;fi<allFacades.length;fi++) allFacades[fi].visible=true;
+  for(fi=0;fi<rightProps.length;fi++) rightProps[fi].visible=true;
   for(var k in FLEET){ FLEET[k].visible=true; FLEET[k].position.x=BAY_X[k]; FLEET[k].position.y=0; }
   if(tagEl)tagEl.textContent='QUARTERS \u00b7 APPARATUS BAY \u2014 PICK YOUR SEAT';
 }
@@ -3066,6 +3068,38 @@ var marquee=(function(){
   var g=new THREE.Group();
   /* corner building hosting the mural */
   g.add(FB(10,11,14,FM.silver,13.5,5.5,-10));
+  /* continuous building rows for the menu: flush, no gaps, out to the fog */
+  (function(){
+    var palette=['#7d4536','#8f564a','#5e4150','#55505c','#6e6256','#7a6a52'];
+    var winLit2=new THREE.MeshBasicMaterial({color:'#ffce7a'});
+    var winDark2=new THREE.MeshStandardMaterial({color:'#2c2430',roughness:0.6});
+    function row(faceX,zStart,zEnd,skipA,skipB){
+      var dir=faceX>0?1:-1, z=zStart;
+      while(z>zEnd){
+        var w=6+Math.random()*6, h=6+Math.random()*9;
+        /* skip the corner building's slot */
+        if(skipA!==undefined && z>skipB && (z-w)<skipA){
+          if(z>skipA){ w=z-skipA; } else { z=skipB; continue; }
+        }
+        var c=palette[Math.floor(Math.random()*palette.length)];
+        var bm=new THREE.MeshStandardMaterial({color:c,roughness:0.95});
+        var b=FB(8,h,w,bm,faceX+dir*4,h/2,z-w/2);
+        g.add(b);
+        g.add(FB(8.2,0.4,w+0.15,new THREE.MeshStandardMaterial({color:'#3a2e3a',roughness:0.9}),faceX+dir*4,h+0.18,z-w/2));
+        if(z>-60){
+          var rows2=Math.max(1,Math.floor(h/3.6)-1), cols2=Math.max(1,Math.floor(w/3));
+          for(var r2=0;r2<rows2;r2++)for(var c2=0;c2<cols2;c2++){
+            var wp=FB(0.1,1.4,1.0,(Math.random()<0.28?winLit2:winDark2),
+              faceX-dir*0.04, 2.4+r2*3.6, (z-w)+ (c2+0.5)*(w/cols2));
+            g.add(wp);
+          }
+        }
+        z-=w+0.05;
+      }
+    }
+    row(10.3,10,-140,-2.6,-17.2);   /* right side, jumping the corner building */
+    row(-10.3,10,-140);             /* left side, unbroken */
+  })();
   g.add(FB(10.2,0.5,14.2,new THREE.MeshStandardMaterial({color:'#6e695e',roughness:0.9}),13.5,11.1,-10));
   var wallM=new THREE.MeshStandardMaterial({color:'#8d8779',roughness:0.95});
   g.add(FB(0.12,11,14,wallM,8.46,5.5,-10));
@@ -3182,10 +3216,12 @@ function enterMenu(){
   flow='menu';
   resetVig();
   marquee.visible=true;
-  /* clear procedural facades that intersect the corner building (z -24..4 right side) */
-  for(var fi=0;fi<rightFacades.length;fi++){
-    var fz=rightFacades[fi].position.z;
-    rightFacades[fi].visible=!(fz<4&&fz>-24);
+  /* menu uses its own continuous street rows: clear all procedural facades,
+     and right-side props that would poke through the corner building */
+  for(var fi=0;fi<allFacades.length;fi++) allFacades[fi].visible=false;
+  for(fi=0;fi<rightProps.length;fi++){
+    var pz=rightProps[fi].position.z;
+    rightProps[fi].visible=!(pz<-1&&pz>-20);
   }
   for(var k in FLEET){ FLEET[k].visible=false; }
   if(tagEl)tagEl.textContent='SAN JULIAN ST \u00b7 CITY LIMIT';
@@ -3234,7 +3270,8 @@ hook('selectScreen',function(){ enterBay(); });
 hook('newState',function(cls){
   exitBay();
   marquee.visible=false;
-  for(var fi=0;fi<rightFacades.length;fi++) rightFacades[fi].visible=true;
+  for(var fi=0;fi<allFacades.length;fi++) allFacades[fi].visible=true;
+  for(fi=0;fi<rightProps.length;fi++) rightProps[fi].visible=true;
   resetVig(); flow='cruise';
   atQuarters=false; outOfService=false; parkIn=-1; surge=0;
   hospitalBld.visible=false; hospitalBld.position.z=200;
