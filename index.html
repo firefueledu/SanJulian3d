@@ -2594,7 +2594,12 @@ var road=box(15,0.2,400,mat.asphalt);road.position.set(0,-0.1,-100);world.add(ro
 
 /* ---------- scrolling pools ---------- */
 var movers=[];
-function addMover(obj,loop){movers.push({obj:obj,loop:loop});world.add(obj);}
+function addMover(obj,loop,margin){
+  /* margin = how far behind the camera the object's ORIGIN must be before
+     recycling. Long objects (city blocks) need origin past camera + their
+     own length, or they teleport while still on screen. */
+  movers.push({obj:obj,loop:loop,m:margin||14});world.add(obj);
+}
 
 for(var i=0;i<34;i++){
   var d=box(0.22,0.02,2.6,mat.cream);
@@ -2687,7 +2692,7 @@ for(var bi=0;bi<BLOCK_N;bi++){
   var blk=buildBlock();
   blk.position.z=8-bi*BLOCK_L;
   cityModules.push(blk);
-  addMover(blk,BLOCK_LOOP);
+  addMover(blk,BLOCK_LOOP,BLOCK_L+14);
 }
 
 /* far skyline (slow parallax) */
@@ -2765,7 +2770,7 @@ var underpassG=(function(){
     var p=box(1.6,8.2,1.6,mat.concrete);p.position.set(x,4.1,zz/2);g.add(p);
   });});
   g.position.z=-160;   /* fixed phase vs city blocks: always mid-block, never on an intersection */
-  addMover(g,BLOCK_LOOP);
+  addMover(g,BLOCK_LOOP,26);
   return g;
 })();
 
@@ -3388,7 +3393,7 @@ function frame(now){
     for(var i=0;i<movers.length;i++){
       var m=movers[i];
       m.obj.position.z+=dz;
-      if(m.obj.position.z>camera.position.z+14)m.obj.position.z-=m.loop;
+      if(m.obj.position.z>camera.position.z+m.m)m.obj.position.z-=m.loop;
     }
     for(var j=0;j<skyliners.length;j++){
       var sk=skyliners[j];
