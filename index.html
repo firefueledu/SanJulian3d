@@ -2758,7 +2758,7 @@ ptA.position.set(-8.6,6,-20);ptB.position.set(8.6,6,-70);
 addMover(ptA,120);addMover(ptB,120);
 
 /* underpass — comes around once per loop */
-(function(){
+var underpassG=(function(){
   var g=new THREE.Group();
   var deck=box(46,2.2,16,mat.concreteDark);deck.position.y=9.2;g.add(deck);
   [-12,0,12].forEach(function(zz){[-5.6,5.6].forEach(function(x){
@@ -2766,6 +2766,7 @@ addMover(ptA,120);addMover(ptB,120);
   });});
   g.position.z=-160;   /* fixed phase vs city blocks: always mid-block, never on an intersection */
   addMover(g,BLOCK_LOOP);
+  return g;
 })();
 
 /* hospital prefab — appears for transport reroutes */
@@ -3094,6 +3095,7 @@ function setChaseCam(){
   camLookT.set(c.look[0],c.look[1],c.look[2]);
 }
 function callIncoming(){
+  hideSceneClutter();
   vig.visible=true; vig.position.z=VIG_SPAWN;
   vital=0.35; crewWalk=0; crewKneel=false;
   patient.userData.upper.rotation.x=0;
@@ -3105,7 +3107,22 @@ function callIncoming(){
 function clearCall(){ /* roll on; the scene scrolls away behind us */
   if(flow==='onScene'||flow==='approach') flow='cruise';
 }
-function resetVig(){ vig.visible=false; vig.position.z=VIG_SPAWN; }
+function resetVig(){ vig.visible=false; vig.position.z=VIG_SPAWN; restoreSceneClutter(); }
+/* clear anything that would block the on-scene shot, put it back after */
+var sceneHidden=[];
+function hideSceneClutter(){
+  for(var i=0;i<rightProps.length;i++){
+    var pz=rightProps[i].position.z;
+    if(rightProps[i].visible&&pz<1&&pz>-13){ rightProps[i].visible=false; sceneHidden.push(rightProps[i]); }
+  }
+  if(underpassG.visible&&underpassG.position.z>-34&&underpassG.position.z<18){
+    underpassG.visible=false; sceneHidden.push(underpassG);
+  }
+}
+function restoreSceneClutter(){
+  for(var i=0;i<sceneHidden.length;i++) sceneHidden[i].visible=true;
+  sceneHidden.length=0;
+}
 /* ---------- apparatus bay: boot/title lineup of all three rigs ---------- */
 var BAY_X={amb:-2.8,eng:2.2,til:7.2};   /* world x: -5 / 0 / +5 across the street */
 function enterBay(){
@@ -3300,7 +3317,7 @@ function hook(name,fn){
   };
 }
 hook('nextStop',function(){
-  clearCall(); surge=1; densify();
+  clearCall(); restoreSceneClutter(); surge=1; densify();
   if(hospitalQueued){
     hospitalQueued=false;
     hospitalBld.visible=true; hospitalBld.position.z=-70;
@@ -3500,6 +3517,13 @@ function frame(now){
   if(flow==='menu'){
     camPosT.set(-1.6+Math.sin(elapsed*0.12)*0.9, 2.2+Math.sin(elapsed*0.09)*0.25, 4.6+Math.cos(elapsed*0.1)*0.7);
     camLookT.set(8.4,4.6,-10);
+  }
+  if(flow==='onScene'){
+    /* across the open street, low and close: rig left of frame, patient + crew center */
+    camPosT.set(0.4+Math.sin(elapsed*0.1)*0.25, 2.8, 3.0);
+    camLookT.set(7.6,1.0,-5.2);
+  }else if(flow==='cruise'||flow==='approach'||flow==='parked'){
+    setChaseCam();
   }
   var ck=1-Math.exp(-dt*2.5);
   camera.position.lerp(camPosT,ck);
