@@ -117,23 +117,30 @@
   .nav-btn{background:#2d291b;border:2px solid var(--amber-dim);color:var(--ink);padding:6px 14px;font-family:var(--body);font-size:18px;cursor:pointer;letter-spacing:1px;text-transform:uppercase;width:auto;line-height:1.2;transition:all .15s ease}
   .nav-btn:hover,.nav-btn:focus{border-color:var(--amber);background:#3c361f;outline:none;box-shadow:0 0 8px rgba(210,167,75,.25)}
 
-  /* ===== 3D CORRIDOR VIEWPORT (visual layer only — engine untouched) ===== */
-  .vp3d{border:3px solid var(--amber-dim);background:#0a0805;box-shadow:0 0 0 4px rgba(141,124,74,.35),inset 0 0 18px rgba(255,235,179,.08);position:relative;margin-bottom:14px;overflow:hidden}
+  /* ===== 3D CORRIDOR VIEWPORT + pinned layout (visual layer only — engine untouched) ===== */
+  html,body{overflow:hidden;height:100%}
+  .wrap{height:100%;display:flex;flex-direction:column;min-height:0}
+  .vp3d{flex:0 0 auto;border:3px solid var(--amber-dim);background:#0a0805;box-shadow:0 0 0 4px rgba(141,124,74,.35),inset 0 0 18px rgba(255,235,179,.08);position:relative;margin-bottom:14px;overflow:hidden}
   .vp3d canvas{display:block;width:100%;height:100%}
   .vp3d .vp3d-tag{position:absolute;left:10px;top:6px;font-family:var(--crt);font-size:15px;color:var(--amber-dim);letter-spacing:2px;pointer-events:none;z-index:2;text-transform:uppercase}
   .vp3d::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.14) 0 2px,transparent 2px 4px)}
+  #gameScroll{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--amber-dim) transparent}
+  #gameScroll::-webkit-scrollbar{width:8px}
+  #gameScroll::-webkit-scrollbar-thumb{background:var(--amber-dim)}
+  #gameScroll::-webkit-scrollbar-track{background:transparent}
 </style>
 </head>
 <body>
 <div class="wrap">
-<div class="vp3d" id="vp3d" style="display:none"><canvas id="cv3d"></canvas><div class="vp3d-tag" id="vp3dTag">RA-800 · SAN JULIAN CORRIDOR</div></div>
+<div class="vp3d" id="vp3d" style="display:none"><canvas id="cv3d"></canvas><div class="vp3d-tag" id="vp3dTag">QUARTERS · APPARATUS BAY</div></div>
+<div id="gameScroll">
 <div id="nav" class="nav-bar" style="display:none">
   <button id="back-btn" class="nav-btn" onclick="navBack()" style="display:none">← BACK</button>
   <button id="home-btn" class="nav-btn" onclick="navHome()" style="display:none">⌂ HOME</button>
 </div>
 <div class="screen" id="app"></div>
 <p class="center small" style="margin-top:14px">a BLS training tool &middot; based on LA County EMS protocols</p>
-<p class="center small" style="margin-top:10px;color:var(--amber-dim);font-size:13px;letter-spacing:1px">&copy; 2026 FIRE FUELED EDUCATION LLC &middot; ALL RIGHTS RESERVED</p></div>
+<p class="center small" style="margin-top:10px;color:var(--amber-dim);font-size:13px;letter-spacing:1px">&copy; 2026 FIRE FUELED EDUCATION LLC &middot; ALL RIGHTS RESERVED</p></div></div>
 <script>
 /* ===================== CLASSES ===================== */
 const CLASSES = {
@@ -2587,6 +2594,15 @@ send.disabled=false;
 
 <script src="./three.min.js"></script>
 <script>
+/* keep the game screen's internal scroller at top on every render (independent of 3D) */
+(function(){
+  var gs=document.getElementById('gameScroll');
+  if(!gs)return;
+  var orig=window.render;
+  if(typeof orig==='function'){
+    window.render=function(){var r=orig.apply(this,arguments);gs.scrollTop=0;return r;};
+  }
+})();
 /* =====================================================================
    SAN JULIAN TRAIL — 3D CORRIDOR VIEWPORT
    Visual layer only. Reads game state (S.progress, skidRowMult) and
@@ -2970,6 +2986,7 @@ function prepUnit(model,label){
   var bb=new THREE.Box3().setFromObject(model);
   var cz=(bb.min.z+bb.max.z)/2;
   var inner=new THREE.Group(); inner.add(model); model.position.z=-cz;
+  inner.rotation.y=Math.PI;   /* nose points down-street, direction of travel */
   var len=bb.max.z-bb.min.z;
   var blob=new THREE.Mesh(new THREE.CircleGeometry(1,16),
     new THREE.MeshBasicMaterial({color:'#000',transparent:true,opacity:0.28}));
@@ -2995,9 +3012,12 @@ var FLEET={
 };
 for(var fk in FLEET)fleetHolder.add(FLEET[fk]);
 var CAMS={
+  /* all cameras stay inside the street corridor (|x| <= 7.2) so they never
+     enter the facade rows at |x| >= 10.5, and below y 7.6 to pass under the
+     underpass deck (underside y 8.1). Bigger rigs frame higher+further back. */
   amb:{pos:[7.2,4.6,11.5],look:[-2,1.6,-8]},
-  eng:{pos:[8.6,5.2,13.8],look:[-2,1.8,-9]},
-  til:{pos:[11.4,6.6,19.0],look:[-2,2.2,-10]}
+  eng:{pos:[7.2,5.4,14.2],look:[-2,1.8,-9]},
+  til:{pos:[7.1,7.2,24.0],look:[-2.2,2.2,-8]}
 };
 var CLASS_VEHICLE={captain:'eng',engineer:'eng',ao:'til',driver:'amb',attendant:'amb'};
 var curKey='amb',unit=FLEET.amb;
@@ -3115,8 +3135,20 @@ function clearCall(){ /* roll on; the scene scrolls away behind us */
   if(flow==='onScene'||flow==='approach') flow='cruise';
 }
 function resetVig(){ vig.visible=false; vig.position.z=VIG_SPAWN; }
+/* ---------- apparatus bay: boot/title lineup of all three rigs ---------- */
+var BAY_X={amb:-2.8,eng:2.2,til:7.2};   /* world x: -5 / 0 / +5 across the street */
+function enterBay(){
+  flow='bay';
+  resetVig();
+  for(var k in FLEET){ FLEET[k].visible=true; FLEET[k].position.x=BAY_X[k]; FLEET[k].position.y=0; }
+  if(tagEl)tagEl.textContent='QUARTERS \u00b7 APPARATUS BAY \u2014 PICK YOUR SEAT';
+}
+function exitBay(){
+  for(var k in FLEET){ FLEET[k].position.x=0; }
+}
 setVehicle('amb');
-setChaseCam();
+enterBay();
+camPosT.set(0,5.6,14.5); camLookT.set(0,1.5,-1);
 camPos.copy(camPosT); camLook.copy(camLookT);
 
 /* ---------- engine hooks (non-destructive) ---------- */
@@ -3153,7 +3185,10 @@ hook('failScreen',function(){ clearCall(); resetVig(); outOfService=true; setTag
 hook('sickFailScreen',function(){ clearCall(); resetVig(); outOfService=true; setTag('OUT OF SERVICE'); });
 hook('renderTriage',function(){ clearCall(); resetVig(); flow='parked'; setTag('MCI \u00b7 START TRIAGE'); });
 hook('chooseRouteScreen',function(ctx){ if(ctx==='hospital') hospitalQueued=true; });
+hook('titleScreen',function(){ enterBay(); });
+hook('selectScreen',function(){ enterBay(); });
 hook('newState',function(cls){
+  exitBay();
   resetVig(); flow='cruise';
   atQuarters=false; outOfService=false; parkIn=-1; surge=0;
   hospitalBld.visible=false; hospitalBld.position.z=200;
@@ -3178,7 +3213,7 @@ function frame(now){
 
   /* speed by flow state */
   var target;
-  if(outOfService||flow==='parked'){ target=0; }
+  if(outOfService||flow==='parked'||flow==='bay'){ target=0; }
   else if(atQuarters&&parkIn<=0){ target=0; }
   else if(flow==='approach'){
     var remain=VIG_STOP-vig.position.z;             /* metres until the scene is beside us */
@@ -3212,7 +3247,7 @@ function frame(now){
       if(hospitalBld.position.z>60){hospitalBld.visible=false;hospitalBld.position.z=200;}
     }
     var W=unit.userData.wheels;
-    for(var w=0;w<W.length;w++)W[w].rotation.x-=dz/W[w].userData.r;
+    for(var w=0;w<W.length;w++)W[w].rotation.x+=dz/W[w].userData.r;
     unit.position.y=Math.sin(elapsed*9)*0.025*clampN(spd/5,0,1);
     if(atQuarters&&parkIn<=0&&spd<0.4){ spd=0; setTag('AT QUARTERS'); }
   }else{
@@ -3250,11 +3285,25 @@ function frame(now){
   var rate2=rolling?7:2.2;
   var phase=Math.floor(elapsed*rate2)%2===0;
   var dark=(atQuarters&&!rolling)||outOfService;
-  var L=unit.userData.lensL,R=unit.userData.lensR,li;
-  for(li=0;li<L.length;li++)L[li].material=dark?FM.lensOff:(phase?FM.lensOn:FM.lensOff);
-  for(li=0;li<R.length;li++)R[li].material=dark?FM.lensOff:(phase?FM.lensOff:FM.lensOn);
+  var L,R,li;
+  if(flow==='bay'){
+    for(var bk in FLEET){
+      L=FLEET[bk].userData.lensL;R=FLEET[bk].userData.lensR;
+      for(li=0;li<L.length;li++)L[li].material=FM.lensOff;
+      for(li=0;li<R.length;li++)R[li].material=FM.lensOff;
+    }
+  }else{
+    L=unit.userData.lensL;R=unit.userData.lensR;
+    for(li=0;li<L.length;li++)L[li].material=dark?FM.lensOff:(phase?FM.lensOn:FM.lensOff);
+    for(li=0;li<R.length;li++)R[li].material=dark?FM.lensOff:(phase?FM.lensOff:FM.lensOn);
+  }
 
-  /* camera: fixed chase framing per vehicle (smooths only on vehicle swap) */
+  /* camera: bay sweep at quarters, fixed chase framing on the trail */
+  if(flow==='bay'){
+    var by=Math.sin(elapsed*0.16)*0.5;
+    camPosT.set(Math.sin(by)*14.5,5.6,Math.cos(by)*14.5);
+    camLookT.set(0,1.5,-1);
+  }
   var ck=1-Math.exp(-dt*2.5);
   camera.position.lerp(camPosT,ck);
   camLook.lerp(camLookT,ck);
