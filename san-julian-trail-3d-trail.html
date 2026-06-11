@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The San Julian Trail — 3D Trail Edition</title>
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root{ --crt:#39ff7a; --crt-dim:#1d8f49; --crt-bg:#04140a; --brick:#B33A2B; --cream:#F2E8D5; }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:#020803;font-family:'VT323',monospace;color:var(--crt);
+    display:flex;align-items:center;justify-content:center;overflow:hidden}
+  #frame{width:min(97vw,900px);max-height:98vh;border:3px solid var(--crt-dim);background:var(--crt-bg);
+    box-shadow:0 0 50px rgba(57,255,122,.15), inset 0 0 80px rgba(0,0,0,.5);position:relative;
+    display:flex;flex-direction:column}
+  #frame::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:5;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.13) 0 2px,transparent 2px 4px)}
+  #head{display:flex;justify-content:space-between;padding:6px 12px;border-bottom:1px solid var(--crt-dim);
+    font-size:18px;letter-spacing:2px;color:#9dffc0}
+  #head .br{color:var(--cream)} #head .br b{color:var(--brick);font-weight:normal}
+  #vp{position:relative;border-bottom:1px solid var(--crt-dim);background:#000}
+  #cv{display:block;width:100%;height:100%}
+  #vpTag{position:absolute;left:10px;top:8px;font-size:16px;color:rgba(242,232,213,.7);letter-spacing:2px;z-index:2}
+  #stat{display:flex;flex-wrap:wrap;gap:4px 18px;padding:6px 12px;font-size:18px;border-bottom:1px solid var(--crt-dim);color:#9dffc0}
+  #stat b{color:var(--crt)}
+  #panel{min-height:200px;padding:10px 14px 12px;font-size:21px;line-height:1.3;overflow-y:auto}
+  #msg{white-space:pre-wrap;margin-bottom:10px;min-height:54px}
+  #msg .hl{color:#ffd27a} #msg .bad{color:#ff9a6a} #msg .good{color:#aaffc8}
+  .opt{display:block;width:100%;text-align:left;background:transparent;border:1px solid var(--crt-dim);
+    color:var(--crt);font:inherit;padding:6px 10px;margin-top:6px;cursor:pointer}
+  .opt:hover,.opt:focus{background:#0a2e18;outline:none}
+  .opt[disabled]{opacity:.4;cursor:default}
+  #foot{padding:5px 12px;border-top:1px solid var(--crt-dim);font-size:16px;color:#5fbf85;display:flex;justify-content:space-between}
+  @media (max-width:560px){ #panel{font-size:18px} #stat{font-size:15px} }
+</style>
+</head>
+<body>
+<div id="frame">
+  <div id="head">
+    <span class="br">FIRE FUELED <b>ED</b></span>
+    <span>THE SAN JULIAN TRAIL</span>
+    <span>v3D-TRAIL.1</span>
+  </div>
+  <div id="vp"><canvas id="cv"></canvas><div id="vpTag">RA-9 · SAN JULIAN CORRIDOR</div></div>
+  <div id="stat"></div>
+  <div id="panel"><div id="msg"></div><div id="opts"></div></div>
+  <div id="foot"><span>1-9 OR CLICK TO CHOOSE · SPACE STOPS THE RIG</span><span>TRAINING SIM — NOT A PROTOCOL REFERENCE</span></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+/* =================================================================
+   THE SAN JULIAN TRAIL — 3D TRAIL EDITION
+   Oregon Trail loop + live low-poly 3D corridor viewport.
+   Single file. No build. No backend.
+   ================================================================= */
+
+/* ---------------- helpers ---------------- */
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function hash(i){ let x=(i*2654435761)>>>0; x^=x>>13; x=(x*2246822519)>>>0; x^=x>>11; return x/4294967296; }
+const lerp=(a,b,t)=>a+(b-a)*t;
+function fmtTime(m){const h=Math.floor(m/60)%24;return String(h).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+
+/* ---------------- game data (same model as the original) ---------------- */
+const CLASSES=[
+  {n:'CAPTAIN CLIPBOARD', d:'Paperwork aura. Street events cost half the time.'},
+  {n:'PUMP PANEL PETE',   d:'Mechanical whisperer. Rig takes 40% less wear.'},
+  {n:'TILLER KILLER',     d:'Threads the needle. Travels 25% faster.'},
+  {n:'DIESEL BOLUS DAVE', d:'Runs on caffeine. Crew energy drains slower.'},
+  {n:'STAY-AND-PLAY RAY', d:'Teaches as he goes. First wrong answer on each call is free.'},
+];
+const CREW_NAMES=['CAP','PETE','TILLER','DAVE','RAY'];
+const STORE=[
+  {k:'o2',  n:'O2 BOTTLE',         p:60, d:'High-flow oxygen. Airway calls want this.'},
+  {k:'nlx', n:'NALOXONE 4MG IN',   p:45, d:'Opioid reversal, nasal spray.'},
+  {k:'glu', n:'GLUCOSE GEL',       p:15, d:'Oral glucose for the conscious hypoglycemic.'},
+  {k:'epi', n:'EPI AUTO-INJECTOR', p:90, d:'Anaphylaxis. Pricey. Saves lives.'},
+  {k:'awy', n:'OPA/NPA AIRWAY KIT',p:35, d:'Adjuncts, all sizes, lube included.'},
+  {k:'cof', n:'COFFEE RATION',     p:10, d:'Restores crew energy when you rest.'},
+  {k:'svc', n:'RIG SERVICE',       p:50, d:'+25% rig condition, applied now.'},
+];
+const TOTAL_BLOCKS=20, HOSPITAL_BLOCK=10;
+
+const ROADS=[
+  {t:'Pothole the size of a kiddie pool on Calder Row. The rig lands hard.', rig:-12},
+  {t:'Street closure at 6th & Marrow. Film crew, of course. Detour.', time:25},
+  {t:'A box truck unloads in your lane. The driver waves a sincere apology.\nYou wait. And wait.', time:18},
+  {t:'Glass field across the intersection. You creep through at walking pace.', rig:-6, time:10},
+  {t:'A wrong-way scooter leads you for half a block like a tiny parade.', time:8},
+];
+const SCAVS=[
+  {t:'An off-duty nurse flags you down and hands over two glucose gels.\n"Tell Ray I said hi."', glu:2},
+  {t:'Supply cache! A sealed case of water bottles behind the station annex.\nThe crew perks up.', energy:12},
+  {t:'The mission cook insists on sending you off with bean burritos.\nMorale: restored.', energy:15},
+  {t:'You find a barely-used O2 bottle left at a cleared post. It checks out.', o2:1},
+];
+const CREWCHECKS=[
+  {t:'DAVE skipped breakfast and is describing it to everyone in detail.', energy:-10, who:3},
+  {t:"TILLER's boots got soaked at the hydrant. He says he's fine.\nHe is not fine.", energy:-8, who:2},
+  {t:'CAP has been filling out the same form for forty minutes.\nThe pen died. Morale dips.', energy:-7, who:0},
+  {t:'PETE hears "a new noise" in the drivetrain and goes quiet.', energy:-6, who:1},
+  {t:'RAY gives an unsolicited 10-minute lecture on capnography.\nEducational. Exhausting.', energy:-6, who:4},
+];
+const CATAS=[
+  {t:'The rig stalls at a light and will not turn over.\nPETE performs percussion therapy on the starter relay.', time:45, rig:-10},
+  {t:'Radio dead spot. Dispatch repeats the same call sign at you\nfor twenty minutes.', time:20},
+];
+const CALLS=[
+ { name:'MAN DOWN BY THE TENTS',
+   intro:'Bystander waves you in mid-block. Adult male, supine beside a\nblue tent. "He was snoring weird, then he stopped talking."',
+   need:'nlx', needName:'NALOXONE',
+   qs:[
+    {q:'Before you close the distance — what comes first?',
+     o:[{t:'Scan the scene: traffic, crowd, hazards, second patient', ok:true,
+         fb:'Scene safety first, every time. You clock an empty Rx bottle\nby the cot and a calm bystander. Workable scene.'},
+        {t:'Run straight in and start compressions', ok:false,
+         fb:'He has a pulse you haven\'t checked and a scene you haven\'t\nread. Size-up precedes contact.'},
+        {t:'Clear everyone back a full block first', ok:false,
+         fb:'You just lost your only historian. A quick scan and a calm\nword keeps the scene AND the information.'}]},
+    {q:'Unresponsive. Pinpoint pupils. RR 6, shallow, snoring.\nStrong radial pulse. Your move:',
+     o:[{t:'Naloxone first — the drug fixes everything', ok:false,
+         fb:'The hypoxia is killing him NOW. Naloxone takes minutes;\nventilation takes seconds.'},
+        {t:'Open airway, OPA, ventilate with BVM + O2, then naloxone', ok:true,
+         fb:'Airway, breathing, THEN the reversal. Titrate to respirations,\nnot consciousness.'},
+        {t:'Recovery position and wait for ALS', ok:false,
+         fb:'At 6 breaths a minute, passive monitoring is a slow code.\nVentilate him.'}]},
+   ],
+   win:'You bag him up, give 4mg IN, and he comes around angry and alive.\nYou leave him with the bystander, a refusal form, and a referral card.',
+   noSupply:'No naloxone on the rig. You ventilate and ride it in to Golden\nState General — he makes it, but it costs you an hour at the wall.' },
+ { name:'THE REGULAR OUTSIDE THE MISSION',
+   intro:'Staff knows him by name. 58-year-old male, confused, sweaty,\ncombative-ish. "He\'s diabetic. He\'s usually sharp as a tack."',
+   need:'glu', needName:'GLUCOSE GEL',
+   qs:[
+    {q:'He\'s awake but altered. First diagnostic move?',
+     o:[{t:'Check a blood glucose', ok:true,
+         fb:'Sugar before psychiatry. Glucometer reads 38 mg/dL.\nThere\'s your altered mental status.'},
+        {t:'Assume intoxication — he\'s on San Julian, after all', ok:false,
+         fb:'That assumption kills diabetics. Altered = check a sugar.\nEvery time. It reads 38.'},
+        {t:'Restrain him for transport immediately', ok:false,
+         fb:'He\'s hypoglycemic, not hostile. Fix the sugar before you\nescalate anything. BG: 38.'}]},
+    {q:'BG 38. He can follow commands and swallow on request. Treatment?',
+     o:[{t:'Oral glucose gel, then a real meal from mission staff', ok:true,
+         fb:'Conscious, protecting his airway, can swallow = oral glucose.\nRecheck in 15. The sandwich matters as much as the gel.'},
+        {t:'Nothing by mouth — wait for ALS to start a line', ok:false,
+         fb:'He can swallow. Withholding oral glucose from a conscious\nhypoglycemic is just watching him get worse.'},
+        {t:'Have him walk it off around the block', ok:false,
+         fb:'A BG of 38 walks straight into the pavement. Treat first.'}]},
+   ],
+   win:'Twenty minutes and one sandwich later he\'s telling TILLER his\ncribbage strategy. BG 112. Mission staff will recheck at dinner.',
+   noSupply:'No glucose on board. Mission staff scrounges juice while you\nmonitor — it works, slowly. Costly minutes you didn\'t have.' },
+ { name:'BEE STING AT THE LOADING DOCK',
+   intro:'Warehouse worker, 30s, stung twice unloading pallets in the Toy\nDistrict. Hives spreading. Voice getting tight.',
+   need:'epi', needName:'EPI AUTO-INJECTOR',
+   qs:[
+    {q:'Hives, facial swelling, hoarse voice, wheezes. This is:',
+     o:[{t:'A local reaction — ice it and release', ok:false,
+         fb:'Two systems involved (skin + airway) = anaphylaxis.\nThis goes downhill in minutes, not hours.'},
+        {t:'Anaphylaxis — airway involvement makes it load-and-go serious', ok:true,
+         fb:'Skin plus airway equals anaphylaxis. The clock is running.'},
+        {t:'A panic attack from the bee encounter', ok:false,
+         fb:'Anxiety doesn\'t cause hives and stridor. Treat the\nanaphylaxis in front of you.'}]},
+    {q:'He has no prescription of his own. Per your local BLS scope:',
+     o:[{t:'Epi auto-injector to the lateral thigh, high-flow O2, rapid transport', ok:true,
+         fb:'Epi is THE drug. Thigh, hold, count. O2 on, early\nnotification, don\'t dawdle for the antihistamine.'},
+        {t:'Benadryl alone and watch him', ok:false,
+         fb:'Antihistamines are a footnote. Epinephrine is the\ntreatment for anaphylaxis.'},
+        {t:'Wait until he fully stops moving air to commit', ok:false,
+         fb:'Early epi saves airways. Late epi meets a cric kit.\nDon\'t wait for the cliff edge.'}]},
+   ],
+   win:'Epi in, color back, wheeze easing. He rides in stable, already\ndrafting the world\'s most dramatic group text.',
+   noSupply:'No epi on the rig. High-flow O2 and a screaming-fast rendezvous\nwith ALS. He survives. You sweat through your uniform.' },
+ { name:'UNRESPONSIVE IN THE SRO LOBBY',
+   intro:'Manager called it in. 64-year-old resident slumped in a lobby\nchair, snoring respirations, won\'t wake up.',
+   need:'awy', needName:'AIRWAY KIT',
+   qs:[
+    {q:'Snoring respirations in an unresponsive patient mean:',
+     o:[{t:'Deep sleep — let him finish the nap', ok:false,
+         fb:'Snoring in an unresponsive patient is the tongue occluding\nthe airway. That\'s an emergency, not a nap.'},
+        {t:'The tongue is obstructing the airway — open it NOW', ok:true,
+         fb:'Head-tilt chin-lift (no trauma suspected). The snore\nsoftens. Now keep it open.'},
+        {t:'Fluid in the lungs — sit him upright and wait', ok:false,
+         fb:'Positioning won\'t fix a tongue. Open the airway manually.'}]},
+    {q:'No gag reflex when you check. To keep the airway open:',
+     o:[{t:'Measure and insert an OPA, O2 by BVM as needed', ok:true,
+         fb:'Corner of mouth to angle of jaw. No gag = OPA is your\nfriend. Reassess constantly.'},
+        {t:'NPA only — OPAs are for cardiac arrests', ok:false,
+         fb:'No gag reflex is the OPA indication. (NPA\'s fine too,\nbut don\'t invent rules that aren\'t there.)'},
+        {t:'Jaw thrust forever, with your two remaining hands', ok:false,
+         fb:'You\'ll need those hands. That\'s what adjuncts are for.'}]},
+   ],
+   win:'OPA in, sats climbing, ALS intercepts two blocks out. The manager\nshakes everyone\'s hand twice. Possible stroke — they\'ll know soon.',
+   noSupply:'No airway kit aboard. You hold manual positioning the whole ride\nin. It works — and your forearms file a grievance.' },
+];
+
+/* ---------------- state ---------------- */
+let S=null;
+function newGame(){
+  S={ cls:-1, cash:300, block:0, time:18*60, rig:100,
+    inv:{o2:0,nlx:0,glu:0,epi:0,awy:0,cof:0},
+    crew:[100,100,100,100,100], pace:1,
+    saves:0, assists:0, score:0,
+    callPool:[0,1,2,3].sort(()=>Math.random()-0.5),
+    hospitalDone:false, travel:false, dist:0 };
+}
+newGame();
+
+/* ---------------- panel UI ---------------- */
+const msgEl=document.getElementById('msg'), optsEl=document.getElementById('opts'),
+      statEl=document.getElementById('stat');
+function setMsg(html){ msgEl.innerHTML=html; }
+function setOpts(list){
+  optsEl.innerHTML='';
+  list.forEach((o,i)=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=(i+1)+') '+o.t;
+    if(o.dis) b.disabled=true; else b.onclick=o.f;
+    optsEl.appendChild(b);
+  });
+}
+document.addEventListener('keydown',e=>{
+  const n=parseInt(e.key);
+  if(n>=1&&n<=9){ const b=optsEl.children[n-1]; if(b&&!b.disabled) b.click(); }
+  if(e.code==='Space'&&S.travel){ e.preventDefault(); pauseTravel(); }
+});
+function stats(){
+  const avgE=Math.round(S.crew.reduce((a,b)=>a+b)/5);
+  statEl.innerHTML=
+    `<span>TIME <b>${fmtTime(S.time)}</b></span>`+
+    `<span>BLOCK <b>${S.block}/${TOTAL_BLOCKS}</b></span>`+
+    `<span>CASH <b>$${S.cash}</b></span>`+
+    `<span>RIG <b>${Math.round(S.rig)}%</b></span>`+
+    `<span>CREW <b>${avgE}%</b></span>`+
+    `<span>PACE <b>${['CODE 1','CODE 2','CODE 3'][S.pace]}</b></span>`+
+    `<span>SAVES <b>${S.saves}</b></span>`;
+}
+
+/* ---------------- screens (Oregon Trail loop) ---------------- */
+function title(){
+  S.travel=false; stats();
+  setMsg(`<span class="hl">THE SAN JULIAN TRAIL — 3D TRAIL EDITION</span>\n`+
+   `A Skid Row EMS expedition in the Oregon Trail tradition.\n`+
+   `Pick your seat. Outfit the rig on a deficit budget.\n`+
+   `Run the calls. Make it back to quarters.`);
+  setOpts([
+    {t:'START SHIFT', f:chooseClass},
+    {t:'HOW TO PLAY', f:()=>{ setMsg(
+      `Travel ${TOTAL_BLOCKS} blocks back to quarters while the corridor\nrolls by up top.\n`+
+      `Golden State General sits at block ${HOSPITAL_BLOCK} — restock at a markup.\n`+
+      `Calls test BLS decision-making and burn supplies.\n`+
+      `Pace trades speed against rig wear and crew energy.\n`+
+      `<span class="hl">SPACE</span> stops the rig while traveling.`);
+      setOpts([{t:'BACK',f:title}]); }},
+  ]);
+}
+function chooseClass(){
+  stats();
+  setMsg(`<span class="hl">PICK YOUR SEAT ON THE RIG:</span>`);
+  setOpts(CLASSES.map((c,i)=>({t:`<b>${c.n}</b> — ${c.d}`, f:()=>{S.cls=i; store();}})));
+}
+function store(){
+  stats();
+  setMsg(`<span class="hl">SUPPLY &amp; MAINTENANCE — "S&amp;M COUNTER"</span>\n`+
+    `Quarterly budget already spent. You get what's left: <b>$${S.cash}</b>.\n`+
+    `O2:${S.inv.o2} NLX:${S.inv.nlx} GLU:${S.inv.glu} EPI:${S.inv.epi} AWY:${S.inv.awy} COF:${S.inv.cof}`);
+  const opts=STORE.map(it=>({
+    t:`${it.n} — $${it.p}  <span style="color:#5fbf85">${it.d}</span>`,
+    dis:S.cash<it.p,
+    f:()=>{ S.cash-=it.p;
+      if(it.k==='svc'){ S.rig=clamp(S.rig+25,0,100); } else S.inv[it.k]++;
+      store(); }
+  }));
+  opts.push({t:'<span class="hl">ROLL OUT — START THE TRAIL</span>', f:startTravel});
+  setOpts(opts);
+}
+function rolling(){
+  S.travel=true;
+  setMsg('Rolling.');
+  setOpts([{t:'STOP THE RIG (SPACE)', f:pauseTravel}]);
+}
+function startTravel(){
+  stats();
+  S.travel=true;
+  setMsg(`Rolling. <span class="hl">SPACE</span> or the button stops the rig.\n`+pick([
+    'The marine layer is burning off over the corridor.',
+    'Dispatch is quiet. Suspiciously quiet.',
+    'Someone left exactly one cone in the middle of the street.',
+    'DAVE has located the good coffee. Hope rises.']));
+  setOpts([{t:'STOP THE RIG (SPACE)', f:pauseTravel}]);
+}
+function pauseTravel(){
+  if(!S.travel) return;
+  S.travel=false;
+  setMsg(`Rig stopped at block ${S.block}.`);
+  setOpts([
+    {t:'CONTINUE', f:rolling},
+    {t:'CHANGE PACE', f:paceMenu},
+    {t:'REST 30 MIN '+(S.inv.cof>0?'(USES 1 COFFEE)':'(NO COFFEE — HALF EFFECT)'), f:rest},
+    {t:'CHECK CREW & SUPPLIES', f:checkSheet},
+  ]);
+}
+function paceMenu(){
+  setMsg(`<span class="hl">SET RESPONSE PACE:</span>\n`+
+   `CODE 1 — careful. Slow, easy on the rig and crew.\n`+
+   `CODE 2 — steady. The default.\n`+
+   `CODE 3 — hot. Fast, chews the rig, frays the crew.`);
+  setOpts([0,1,2].map(p=>({t:['CODE 1','CODE 2','CODE 3'][p]+(S.pace===p?'  <b>&lt;CURRENT&gt;</b>':''),
+    f:()=>{S.pace=p; stats(); pauseTravel();}})));
+}
+function rest(){
+  S.time+=30;
+  const boost=S.inv.cof>0?22:10;
+  if(S.inv.cof>0)S.inv.cof--;
+  S.crew=S.crew.map(c=>clamp(c+boost,0,100));
+  stats();
+  setMsg(`<span class="good">The crew rests${boost>10?' over hot coffee':''}. Energy +${boost}%.</span>`);
+  setOpts([{t:'BACK', f:pauseTravel}]);
+}
+function checkSheet(){
+  setMsg(`<span class="hl">CREW</span>\n`+
+    S.crew.map((c,i)=>`${CREW_NAMES[i].padEnd(7,' ')} ${'█'.repeat(Math.round(c/10)).padEnd(10,'░')} ${Math.round(c)}%${i===S.cls?'  &lt;YOU&gt;':''}`).join('\n')+
+    `\n\n<span class="hl">SUPPLIES</span>  O2:${S.inv.o2}  NALOXONE:${S.inv.nlx}  GLUCOSE:${S.inv.glu}  EPI:${S.inv.epi}  AIRWAY:${S.inv.awy}  COFFEE:${S.inv.cof}`);
+  setOpts([{t:'BACK', f:pauseTravel}]);
+}
+
+const BLOCK_M=110; /* metres per block in the 3D world */
+function arriveBlock(){
+  S.block++;
+  const drainMul=(S.cls===3?0.6:1);
+  S.crew=S.crew.map(c=>clamp(c-[1.5,2.5,4][S.pace]*drainMul,0,100));
+  S.rig=clamp(S.rig-[0.6,1.2,2.6][S.pace]*(S.cls===1?0.6:1),0,100);
+  S.time+=Math.round([14,11,8][S.pace]/(S.cls===2?1.25:1));
+  stats();
+  if(S.rig<=0) return rigDead();
+  if(S.block>=TOTAL_BLOCKS) return endShift();
+  if(S.block===HOSPITAL_BLOCK && !S.hospitalDone) return hospital();
+  const roll=Math.random();
+  if(roll<0.30 && S.callPool.length) return runCall();
+  if(roll<0.55) return streetEvent();
+}
+function streetEvent(){
+  S.travel=false;
+  const pool=Math.random()<0.12?CATAS:pick([ROADS,ROADS,SCAVS,CREWCHECKS]);
+  const ev=pick(pool);
+  let extra='';
+  if(ev.rig){S.rig=clamp(S.rig+ev.rig*(S.cls===1?0.6:1),0,100); extra+=`\n<span class="bad">RIG ${ev.rig}%</span>`;}
+  if(ev.time){const t=Math.round(ev.time*(S.cls===0?0.5:1)); S.time+=t; extra+=`\n<span class="bad">+${t} MIN</span>`;}
+  if(ev.energy){ if(ev.who!=null&&ev.energy<0)S.crew[ev.who]=clamp(S.crew[ev.who]+ev.energy,0,100);
+    else S.crew=S.crew.map(c=>clamp(c+ev.energy,0,100));
+    extra+=`\n<span class="${ev.energy>0?'good':'bad'}">CREW ${ev.energy>0?'+':''}${ev.energy}%</span>`;}
+  if(ev.glu){S.inv.glu+=ev.glu; extra+=`\n<span class="good">+${ev.glu} GLUCOSE GEL</span>`;}
+  if(ev.o2){S.inv.o2+=ev.o2; extra+=`\n<span class="good">+1 O2 BOTTLE</span>`;}
+  stats();
+  setMsg(esc(ev.t)+extra);
+  setOpts([{t:'CONTINUE', f:rolling}]);
+}
+function rigDead(){
+  S.travel=false;
+  setMsg(`<span class="bad">The rig gives up entirely at block ${S.block}.</span>\n`+
+    `Shops tows you in. The crew finishes the shift on a reserve unit\nthat smells like 1987.\n\n`+
+    `<span class="hl">SHIFT INCOMPLETE.</span> Saves: ${S.saves}.`);
+  setOpts([{t:'TRY ANOTHER SHIFT', f:()=>{newGame(); resetWorld(); title();}}]);
+}
+function hospital(){
+  S.travel=false; S.hospitalDone=true;
+  S.time+=20; stats();
+  setMsg(`<span class="hl">GOLDEN STATE GENERAL — AMBULANCE RAMP</span>\n`+
+    `Six rigs from four agencies on the wall. Triage RN gives you the nod.\n`+
+    `You can restock here — at hospital-gift-shop prices.`);
+  hospStore();
+}
+function hospStore(){
+  const opts=STORE.filter(i=>i.k!=='svc').map(it=>{
+    const p=Math.round(it.p*1.5);
+    return {t:`${it.n} — $${p}`, dis:S.cash<p, f:()=>{S.cash-=p; S.inv[it.k]++; stats(); hospStore();}};
+  });
+  opts.push({t:'<span class="hl">BACK TO THE STREET</span>', f:rolling});
+  setMsg(`<span class="hl">GOLDEN STATE GENERAL — SUPPLY EXCHANGE</span>  CASH: $${S.cash}\n`+
+    `O2:${S.inv.o2} NLX:${S.inv.nlx} GLU:${S.inv.glu} EPI:${S.inv.epi} AWY:${S.inv.awy} COF:${S.inv.cof}`);
+  setOpts(opts);
+}
+
+/* calls */
+let call=null, qIdx=0, freeMiss=false;
+function runCall(){
+  S.travel=false;
+  call=CALLS[S.callPool.shift()];
+  qIdx=0; freeMiss=(S.cls===4);
+  setMsg(`<span class="hl">*** DISPATCH — ${call.name} ***</span>\n`+esc(call.intro));
+  setOpts([{t:'GO TO WORK', f:askQ}]);
+}
+function askQ(){
+  const q=call.qs[qIdx];
+  setMsg(`<span class="hl">${call.name}</span>\n`+esc(q.q));
+  setOpts(q.o.map(o=>({t:esc(o.t), f:()=>answerQ(o)})));
+}
+function answerQ(o){
+  if(o.ok){
+    setMsg(`<span class="good">CORRECT.</span>\n`+esc(o.fb));
+    if(qIdx<call.qs.length-1) setOpts([{t:'NEXT', f:()=>{qIdx++; askQ();}}]);
+    else setOpts([{t:'RUN THE TREATMENT', f:resolveCall}]);
+  }else{
+    if(freeMiss){ freeMiss=false;
+      setMsg(`<span class="bad">Not it.</span> ${esc(o.fb)}\n\n<span class="good">RAY steps in: "Walk it back. Try again — no harm done."</span>`);
+      setOpts([{t:'TRY AGAIN', f:askQ}]);
+    }else{
+      S.crew=S.crew.map(c=>clamp(c-6,0,100)); S.time+=10; stats();
+      setMsg(`<span class="bad">WRONG.</span> ${esc(o.fb)}\n<span class="bad">CREW -6% · +10 MIN — the call gets harder.</span>`);
+      setOpts([{t:'TRY AGAIN', f:askQ}]);
+    }
+  }
+}
+function resolveCall(){
+  if(S.inv[call.need]>0){
+    S.inv[call.need]--; S.saves++; S.time+=15; stats();
+    setMsg(`<span class="good">${esc(call.win)}</span>\n\n<span class="hl">SAVE LOGGED. -1 ${call.needName}.</span>`);
+  }else{
+    S.assists++; S.time+=50; stats();
+    setMsg(`<span class="bad">${esc(call.noSupply)}</span>\n\n<span class="hl">PATIENT OK — BUT THAT COST 50 MINUTES. STOCK THE RIG.</span>`);
+  }
+  setOpts([{t:'BACK IN SERVICE', f:rolling}]);
+}
+function endShift(){
+  S.travel=false;
+  const avgE=Math.round(S.crew.reduce((a,b)=>a+b)/5);
+  const timeBonus=Math.max(0, (26*60 - S.time));
+  const supplies=Object.values(S.inv).reduce((a,b)=>a+b,0);
+  S.score=S.saves*120 + S.assists*40 + supplies*8 + Math.round(S.rig) + avgE + Math.round(timeBonus/4);
+  const rank= S.score>=520?'CAPTAIN CLIPBOARD APPROVED':
+              S.score>=400?'SEASONED VETERAN':
+              S.score>=280?'SOLID BOOT':'PROBIE — RUN IT AGAIN';
+  setMsg(`<span class="hl">BACK AT QUARTERS — SHIFT DEBRIEF</span>\n`+
+   `Saves: <b>${S.saves}</b>   Assists: <b>${S.assists}</b>   Clock-out: <b>${fmtTime(S.time)}</b>\n`+
+   `Rig: <b>${Math.round(S.rig)}%</b>   Crew energy: <b>${avgE}%</b>   Supplies left: <b>${supplies}</b>\n\n`+
+   `SCORE: <span class="good">${S.score}</span>\n`+
+   `RANK: <span class="hl">${rank}</span>\n\n`+
+   `Somewhere on the corridor, four people are still breathing\nbecause a rig rolled past at the right moment.`);
+  setOpts([{t:'RUN ANOTHER SHIFT', f:()=>{newGame(); resetWorld(); title();}}]);
+}
+
+/* =================================================================
+   3D VIEWPORT — the corridor rolls past while the rig drives
+   ================================================================= */
+const cv=document.getElementById('cv'), vp=document.getElementById('vp');
+const renderer=new THREE.WebGLRenderer({canvas:cv, antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();
+scene.fog=new THREE.Fog(0xb06a55, 26, 150);
+const camera=new THREE.PerspectiveCamera(58, 16/9, 0.1, 500);
+camera.position.set(7.2, 4.6, 11.5);
+camera.lookAt(-2, 1.6, -8);
+
+function sizeViewport(){
+  const w=vp.clientWidth, h=Math.max(220, Math.min(360, Math.round(w*0.42)));
+  vp.style.height=h+'px';
+  renderer.setSize(w,h,false);
+  camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+addEventListener('resize',sizeViewport);
+
+/* ---- materials / helpers ---- */
+const M=c=>new THREE.MeshLambertMaterial({color:c});
+const mat={
+  asphalt:M('#33303b'), sidewalk:M('#5b565e'), curb:M('#6e6870'),
+  bricks:[M('#7d4536'),M('#8f564a'),M('#5e4150'),M('#55505c')],
+  concrete:M('#7a7480'), concreteDark:M('#55505c'),
+  rollup:M('#4a6157'), trim:M('#3a2e3a'),
+  tents:[M('#3f6a8a'),M('#c46a3a'),M('#4f7a55'),M('#6a86c2')],
+  cream:M('#F2E8D5'), brickRed:M('#B33A2B'),
+  metal:M('#8a8f99'), darkMetal:M('#3c4048'),
+  winLit:new THREE.MeshBasicMaterial({color:'#5a6a7a'}),
+  winDark:M('#2c2430'),
+  sodium:new THREE.MeshBasicMaterial({color:'#ffb45e'}),
+  glowRed:new THREE.MeshBasicMaterial({color:'#ff3b30'}),
+  glowBlue:new THREE.MeshBasicMaterial({color:'#3b7bff'}),
+  glass:M('#bfe3d8'),
+};
+const box=(w,h,d,m)=>new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);
+const cyl=(rt,rb,h,m,s=10)=>new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,s),m);
+function textTex(draw,w=512,h=256){
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  draw(c.getContext('2d'),w,h);
+  return new THREE.CanvasTexture(c);
+}
+
+/* ---- sky ---- */
+const skyU={ top:{value:new THREE.Color('#7ec4d8')}, mid:{value:new THREE.Color('#a8d4cf')}, bot:{value:new THREE.Color('#cfe8d8')} };
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(380,24,14),
+  new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,uniforms:skyU,
+    vertexShader:`varying vec3 vp;void main(){vp=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+    fragmentShader:`varying vec3 vp;uniform vec3 top;uniform vec3 mid;uniform vec3 bot;
+      void main(){float h=normalize(vp).y;
+      vec3 c=h>0.12?mix(mid,top,smoothstep(0.12,0.65,h)):mix(bot,mid,smoothstep(-0.04,0.12,h));
+      gl_FragColor=vec4(c,1.);}`})));
+
+/* ---- lights ---- */
+const hemi=new THREE.HemisphereLight(0xbcd8e8, 0x4a4040, 0.9); scene.add(hemi);
+const sun=new THREE.DirectionalLight(0xfff2d8, 1.1); sun.position.set(-40,35,20); scene.add(sun);
+
+/* ---- static ground/road (long enough to never show edges) ---- */
+const world=new THREE.Group(); scene.add(world);
+const road=box(15,0.2,400,mat.asphalt); road.position.set(0,-0.1,-100); world.add(road);
+[-1,1].forEach(s=>{
+  const sw=box(6,0.32,400,mat.sidewalk); sw.position.set(s*10.2,-0.04,-100); world.add(sw);
+  const cb=box(0.3,0.3,400,mat.curb); cb.position.set(s*7.4,0,-100); world.add(cb);
+});
+
+/* ---- scrolling pools ---- */
+const movers=[]; /* {obj, loop, far} — obj.position.z += dz; wrap past camera */
+function addMover(obj, loop){ movers.push({obj,loop}); world.add(obj); }
+
+/* dashed center line */
+for(let i=0;i<34;i++){
+  const d=box(0.22,0.02,2.6,mat.cream);
+  d.position.set(0,0.01,15-i*6);
+  addMover(d, 34*6);
+}
+
+/* facades */
+function makeFacade(side){
+  /* building runs ALONG the street: depth 8 toward/away from road (x),
+     width w along the direction of travel (z). street face = x toward road */
+  const g=new THREE.Group();
+  const w=12+Math.random()*4, h=8+Math.random()*10;
+  const body=box(8,h,w,pick(mat.bricks)); body.position.y=h/2; g.add(body);
+  const cap=box(8.3,0.45,w+0.3,mat.trim); cap.position.y=h+0.2; g.add(cap);
+  const faceX = side*-4.05;            /* toward the road */
+  const rows=Math.max(1,Math.floor(h/3.4)-1), cols=Math.max(2,Math.floor(w/3));
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const win=box(0.1,1.5,1.1, Math.random()<0.3?mat.winLit:mat.winDark);
+    win.position.set(faceX, 2.6+r*3.4, -w/2+(c+0.5)*(w/cols));
+    g.add(win);
+  }
+  if(side>0 && Math.random()<0.6){
+    const door=box(0.12,3,3.4,mat.rollup); door.position.set(faceX,1.5,0); g.add(door);
+  }
+  g.position.x=side*14.5;
+  return g;
+}
+const FAC_N=13, FAC_SP=17, FAC_LOOP=FAC_N*FAC_SP;
+[-1,1].forEach(side=>{
+  for(let i=0;i<FAC_N;i++){
+    const f=makeFacade(side);
+    f.position.z=20-i*FAC_SP - (side>0?7:0);
+    addMover(f, FAC_LOOP);
+  }
+});
+
+/* far skyline (slower parallax) */
+const skyliners=[];
+[-1,1].forEach(side=>{
+  for(let i=0;i<10;i++){
+    const h=14+Math.random()*30;
+    const b=box(14+Math.random()*10,h,10,mat.concreteDark);
+    b.position.set(side*(30+Math.random()*14), h/2-2, 30-i*36);
+    skyliners.push({obj:b, loop:360});
+    world.add(b);
+  }
+});
+
+/* sidewalk props */
+function makeProp(){
+  const r=Math.random(), g=new THREE.Group();
+  if(r<0.26){ /* streetlight */
+    const pole=cyl(0.09,0.12,6.5,mat.darkMetal); pole.position.y=3.25; g.add(pole);
+    const arm=box(1.7,0.1,0.1,mat.darkMetal); arm.position.set(0.85,6.4,0); g.add(arm);
+    const bulb=box(0.5,0.12,0.26,mat.sodium); bulb.position.set(1.6,6.3,0); g.add(bulb);
+    g.userData.lamp=bulb;
+  }else if(r<0.46){ /* tent */
+    const t=new THREE.Mesh(new THREE.CylinderGeometry(0.02,1.15,1.5,4),pick(mat.tents));
+    t.rotation.y=Math.PI/4; t.position.y=0.75; t.scale.set(1.25,1,1.05); g.add(t);
+  }else if(r<0.58){ /* cart */
+    const bk=box(0.8,0.6,1.1,mat.metal); bk.position.y=0.75; g.add(bk);
+    const load=box(0.75,0.35,1.0,pick(mat.tents)); load.position.y=1.15; g.add(load);
+  }else if(r<0.68){ /* hydrant */
+    const h=cyl(0.16,0.2,0.7,mat.brickRed,8); h.position.y=0.35; g.add(h);
+  }else if(r<0.80){ /* dumpster */
+    const d=box(2.2,1.3,1.2,M('#3f5a4a')); d.position.y=0.75; g.add(d);
+  }else if(r<0.88){ /* narcan box */
+    const pole=cyl(0.06,0.08,2.4,mat.darkMetal); pole.position.y=1.2; g.add(pole);
+    const bx=box(0.5,0.62,0.24,mat.cream); bx.position.y=2.0; g.add(bx);
+    const c1=box(0.26,0.08,0.02,mat.brickRed); c1.position.set(0,2,0.13); g.add(c1);
+    const c2=box(0.08,0.26,0.02,mat.brickRed); c2.position.set(0,2,0.13); g.add(c2);
+  }else{ /* crates */
+    const c=box(0.5,0.4,0.5,M('#7a5a8a')); c.position.y=0.2; g.add(c);
+  }
+  return g;
+}
+const PROP_N=22, PROP_SP=10, PROP_LOOP=PROP_N*PROP_SP;
+const lamps=[];
+[-1,1].forEach(side=>{
+  for(let i=0;i<PROP_N;i++){
+    const p=makeProp();
+    p.position.set(side*(8.6+Math.random()*1.4), 0, 18-i*PROP_SP-(side>0?5:0));
+    if(side>0) p.rotation.y=Math.PI;
+    if(p.userData.lamp) lamps.push(p.userData.lamp);
+    addMover(p, PROP_LOOP);
+  }
+});
+
+/* two real streetlight point lights riding the loop */
+const ptA=new THREE.PointLight(0xffb45e,0,26,1.8), ptB=new THREE.PointLight(0xffb45e,0,26,1.8);
+ptA.position.set(-8.6,6,-20); ptB.position.set(8.6,6,-70);
+addMover(ptA, 120); addMover(ptB, 120); 
+
+/* underpass — comes around once per loop */
+const underpass=(function(){
+  const g=new THREE.Group();
+  const deck=box(46,2.2,16,mat.concreteDark); deck.position.y=9.2; g.add(deck);
+  [-12,0,12].forEach(zz=>{[-5.6,5.6].forEach(x=>{
+    const p=box(1.6,8.2,1.6,mat.concrete); p.position.set(x,4.1,zz/2); g.add(p);
+  });});
+  g.position.z=-160;
+  addMover(g, FAC_LOOP);
+  return g;
+})();
+
+/* hospital prefab — hidden until block 9; runs parallel to the street */
+const hospitalBld=(function(){
+  const g=new THREE.Group();
+  const body=box(9,12,22,M('#cfd8d4')); body.position.set(0,6,0); g.add(body);
+  const band=box(9.2,1.2,22.2,M('#aab8b2')); band.position.y=10.5; g.add(band);
+  const sT=textTex((c,w,h)=>{
+    c.fillStyle='#cfd8d4'; c.fillRect(0,0,w,h);
+    c.fillStyle='#B33A2B'; c.fillRect(w/2-30,30,60,160); c.fillRect(w/2-80,80,160,60);
+    c.fillStyle='#1c2a26'; c.font='bold 54px VT323,monospace'; c.textAlign='center';
+    c.fillText('GOLDEN STATE GENERAL', w/2, 236);
+  },512,256);
+  const sign=new THREE.Mesh(new THREE.PlaneGeometry(12,6), new THREE.MeshBasicMaterial({map:sT}));
+  sign.position.set(-4.55,6.5,0); sign.rotation.y=-Math.PI/2; g.add(sign);
+  const canopy=box(5,0.4,9,mat.brickRed); canopy.position.set(-6.5,3.4,0); g.add(canopy);
+  [[-3.6],[3.6]].forEach(p=>{const leg=box(0.2,3.2,0.2,mat.darkMetal);leg.position.set(-8.6,1.7,p[0]);g.add(leg);});
+  g.position.set(16,0,200); g.visible=false; world.add(g);
+  return g;
+})();
+
+/* ---- the rig (kept from the 3D build) ---- */
+const rig=(function(){
+  const g=new THREE.Group();
+  const boxBody=box(2.5,2.2,4.4,mat.cream); boxBody.position.set(0,1.55,-0.6); g.add(boxBody);
+  const cab=box(2.3,1.5,1.8,mat.cream); cab.position.set(0,1.05,2.4); g.add(cab);
+  const hood=box(2.3,0.75,0.7,mat.cream); hood.position.set(0,0.7,3.6); g.add(hood);
+  const windshield=box(2.1,0.7,0.08,mat.glass); windshield.position.set(0,1.45,3.2); windshield.rotation.x=-0.25; g.add(windshield);
+  const sT=textTex((c,w,h)=>{
+    c.fillStyle='#F2E8D5'; c.fillRect(0,0,w,h);
+    c.fillStyle='#B33A2B'; c.fillRect(0,h*0.42,w,h*0.2);
+    c.font='bold 60px Arial'; c.fillStyle='#2a1a22';
+    c.fillText('FIRE FUELED EMS', 30, h*0.30);
+    c.font='bold 88px Arial'; c.fillStyle='#B33A2B';
+    c.fillText('RA-9', w-260, h*0.92);
+  },1024,256);
+  [-1,1].forEach(s=>{
+    const side=new THREE.Mesh(new THREE.PlaneGeometry(4.3,1.1),new THREE.MeshBasicMaterial({map:sT}));
+    side.position.set(s*1.262,1.5,-0.6);
+    side.rotation.y=s>0?Math.PI/2:-Math.PI/2;
+    g.add(side);
+  });
+  const wheels=[];
+  [[-1.05,2.7],[1.05,2.7],[-1.05,-1.6],[1.05,-1.6]].forEach(p=>{
+    const w=cyl(0.42,0.42,0.32,mat.darkMetal,12); w.rotation.z=Math.PI/2;
+    w.position.set(p[0],0.42,p[1]); g.add(w); wheels.push(w);
+  });
+  const bar=box(1.6,0.16,0.4,mat.darkMetal); bar.position.set(0,2.78,1.0); g.add(bar);
+  const lr=box(0.5,0.14,0.34,mat.glowRed); lr.position.set(-0.5,2.8,1.0); g.add(lr);
+  const lb=box(0.5,0.14,0.34,mat.glowBlue); lb.position.set(0.5,2.8,1.0); g.add(lb);
+  /* soft blob shadow */
+  const blob=new THREE.Mesh(new THREE.CircleGeometry(2.6,16),
+    new THREE.MeshBasicMaterial({color:'#000',transparent:true,opacity:0.28}));
+  blob.rotation.x=-Math.PI/2; blob.position.y=0.02; blob.scale.set(0.85,1.4,1); g.add(blob);
+  g.userData={lr,lb,wheels};
+  g.position.set(-2.2,0,0);
+  scene.add(g);
+  return g;
+})();
+
+/* ---- time-of-day palettes ---- */
+const TOD={
+  day:  {skyT:'#7ec4d8',skyM:'#a8d4cf',skyB:'#cfe8d8',fog:'#bcd4cc',sun:'#fff2d8',sunI:1.1,hemI:0.9,win:'#5a6a7a',lampI:0},
+  dusk: {skyT:'#3a2a5e',skyM:'#6e3055',skyB:'#d97a4a',fog:'#b06a55',sun:'#ff9a5a',sunI:0.85,hemI:0.65,win:'#ffce7a',lampI:0.5},
+  night:{skyT:'#0a0820',skyM:'#241a3a',skyB:'#41284a',fog:'#2a1c34',sun:'#7a86c8',sunI:0.28,hemI:0.32,win:'#ffce7a',lampI:1.0},
+};
+const _c1=new THREE.Color(), _c2=new THREE.Color();
+function blendC(target, a, b, t){ _c1.set(a); _c2.set(b); target.copy(_c1).lerp(_c2,t); }
+function applyTOD(){
+  const p=S.block/TOTAL_BLOCKS;
+  let A,B,t;
+  if(p<0.45){A=TOD.day;B=TOD.dusk;t=clamp(p/0.45,0,1);}
+  else{A=TOD.dusk;B=TOD.night;t=clamp((p-0.45)/0.55,0,1);}
+  blendC(skyU.top.value,A.skyT,B.skyT,t);
+  blendC(skyU.mid.value,A.skyM,B.skyM,t);
+  blendC(skyU.bot.value,A.skyB,B.skyB,t);
+  blendC(scene.fog.color,A.fog,B.fog,t);
+  blendC(sun.color,A.sun,B.sun,t);
+  sun.intensity=lerp(A.sunI,B.sunI,t);
+  hemi.intensity=lerp(A.hemI,B.hemI,t);
+  blendC(mat.winLit.color,A.win,B.win,t);
+  const li=lerp(A.lampI,B.lampI,t);
+  ptA.intensity=li; ptB.intensity=li;
+  blendC(mat.sodium.color, '#8a868e', '#ffb45e', clamp(li*1.6,0,1));
+}
+
+/* hospital placement */
+let hospPlaced=false;
+function maybePlaceHospital(){
+  if(!hospPlaced && S.block===HOSPITAL_BLOCK-1 && !S.hospitalDone){
+    hospPlaced=true; hospitalBld.visible=true; hospitalBld.position.z=-130;
+  }
+}
+function resetWorld(){
+  hospPlaced=false; hospitalBld.visible=false; hospitalBld.position.z=200;
+}
+
+/* ---- main loop ---- */
+let last=performance.now(), elapsed=0;
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt=Math.min(0.05,(now-last)/1000); last=now; elapsed+=dt;
+
+  if(S.travel){
+    const spMul=(S.cls===2?1.25:1)*[0.75,1,1.5][S.pace];
+    const dz=9*spMul*dt;            /* metres this frame */
+    S.dist+=dz;
+    for(const m of movers){
+      m.obj.position.z+=dz;
+      if(m.obj.position.z>camera.position.z+14) m.obj.position.z-=m.loop;
+    }
+    for(const m of skyliners){
+      m.obj.position.z+=dz*0.35;
+      if(m.obj.position.z>camera.position.z+30) m.obj.position.z-=m.loop;
+    }
+    if(hospitalBld.visible && hospitalBld.position.z<60){
+      hospitalBld.position.z+=dz;
+    }
+    /* wheel spin + bob */
+    rig.userData.wheels.forEach(w=>w.rotation.x-=dz/0.42);
+    rig.position.y=Math.sin(elapsed*9)*0.025;
+    if(S.dist>=BLOCK_M){ S.dist-=BLOCK_M; arriveBlock(); maybePlaceHospital(); }
+  }else{
+    rig.position.y*=0.9;
+  }
+
+  /* lightbar — blinks faster at Code 3, slow idle otherwise */
+  const rate=S.pace===2?7:3;
+  const blink=Math.floor(elapsed*rate)%2===0;
+  rig.userData.lr.material=blink?mat.glowRed:mat.darkMetal;
+  rig.userData.lb.material=blink?mat.darkMetal:mat.glowBlue;
+
+  applyTOD();
+  renderer.render(scene,camera);
+}
+
+sizeViewport();
+title();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
