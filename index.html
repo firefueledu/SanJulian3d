@@ -2622,10 +2622,12 @@ function makeFacade(side){
   return g;
 }
 var FAC_N=13,FAC_SP=17,FAC_LOOP=FAC_N*FAC_SP;
+var rightFacades=[];
 [-1,1].forEach(function(side){
   for(var i=0;i<FAC_N;i++){
     var f=makeFacade(side);
     f.position.z=20-i*FAC_SP-(side>0?7:0);
+    if(side>0) rightFacades.push(f);
     addMover(f,FAC_LOOP);
   }
 });
@@ -3052,6 +3054,7 @@ function enterBay(){
   flow='bay';
   resetVig();
   marquee.visible=false;
+  for(var fi=0;fi<rightFacades.length;fi++) rightFacades[fi].visible=true;
   for(var k in FLEET){ FLEET[k].visible=true; FLEET[k].position.x=BAY_X[k]; FLEET[k].position.y=0; }
   if(tagEl)tagEl.textContent='QUARTERS \u00b7 APPARATUS BAY \u2014 PICK YOUR SEAT';
 }
@@ -3099,15 +3102,6 @@ var marquee=(function(){
   },768,576);
   var sign=new THREE.Mesh(new THREE.PlaneGeometry(9.8,7.35),new THREE.MeshStandardMaterial({map:sT,roughness:0.9}));
   sign.position.set(8.42,5.4,-10); sign.rotation.y=-Math.PI/2; g.add(sign);
-  /* big wall-mounted sign, angled square at the menu camera, at frame center height */
-  var sign2=new THREE.Mesh(new THREE.PlaneGeometry(9.6,7.0),new THREE.MeshStandardMaterial({map:sT,roughness:0.85}));
-  sign2.position.set(7.55,4.35,-9.8); sign2.rotation.y=-0.6; g.add(sign2);
-  var s2back=FB(9.7,7.1,0.18,new THREE.MeshStandardMaterial({color:'#4a4640',roughness:0.9}),0,0,-0.12);
-  sign2.add(s2back);
-  [[-4.2,2.6],[4.2,2.6],[-4.2,-2.6],[4.2,-2.6]].forEach(function(p){
-    var strut=FB(0.18,0.18,1.4,FM.chassis2,p[0],p[1],-0.8);
-    sign2.add(strut);
-  });
   /* sidewalk dressing in front of the wall: tents, cart, cone */
   function mTent(x,z,rot,col,sc){
     var t=new THREE.Mesh(new THREE.CylinderGeometry(0.02,1.15,1.5,4),new THREE.MeshStandardMaterial({color:col,roughness:0.85}));
@@ -3136,7 +3130,7 @@ var marquee=(function(){
   function bottle(x,z,r){var bt=FC(0.04,0.05,0.26,new THREE.MeshStandardMaterial({color:'#3f6a45',roughness:0.4}),6,x,0.05,z);
     bt.rotation.z=Math.PI/2;bt.rotation.y=r;g.add(bt);}
   function lit(x,z,r){var l2=FB(0.22,0.012,0.16,litM,x,0.012,z);l2.rotation.y=r;g.add(l2);}
-  bag(6.1,-1.4,1);bag(8.6,-8.2,0.8);bag(6.8,-7.6,1.1);bag(-8.1,-5.2,0.9);bag(5.9,-10.4,0.7);
+  bag(6.1,-1.4,1);bag(6.7,-8.4,0.8);bag(6.8,-7.6,1.1);bag(-8.1,-5.2,0.9);bag(5.9,-10.4,0.7);
   cb(7.4,-5.6,0.5);cb(6.2,-3.1,1.8);cb(-8.5,-8.9,0.9);cb(8.3,-12.3,2.4);
   bottle(5.7,-2.6,0.4);bottle(6.4,-6.2,1.7);bottle(-7.9,-7.1,2.6);
   lit(5.5,-4.4,0.7);lit(6.9,-1.1,2.1);lit(-8.2,-2.4,1.2);lit(6.0,-8.9,0.2);lit(7.7,-10.7,2.9);lit(-8.8,-11.6,1.5);
@@ -3188,12 +3182,17 @@ function enterMenu(){
   flow='menu';
   resetVig();
   marquee.visible=true;
+  /* clear procedural facades that intersect the corner building (z -24..4 right side) */
+  for(var fi=0;fi<rightFacades.length;fi++){
+    var fz=rightFacades[fi].position.z;
+    rightFacades[fi].visible=!(fz<4&&fz>-24);
+  }
   for(var k in FLEET){ FLEET[k].visible=false; }
   if(tagEl)tagEl.textContent='SAN JULIAN ST \u00b7 CITY LIMIT';
 }
 setVehicle('amb');
 enterMenu();
-camPosT.set(-1.6,2.4,4.6); camLookT.set(7.55,4.35,-9.8);
+camPosT.set(-1.6,2.2,4.6); camLookT.set(8.4,4.6,-10);
 camPos.copy(camPosT); camLook.copy(camLookT);
 
 /* ---------- engine hooks (non-destructive) ---------- */
@@ -3235,6 +3234,7 @@ hook('selectScreen',function(){ enterBay(); });
 hook('newState',function(cls){
   exitBay();
   marquee.visible=false;
+  for(var fi=0;fi<rightFacades.length;fi++) rightFacades[fi].visible=true;
   resetVig(); flow='cruise';
   atQuarters=false; outOfService=false; parkIn=-1; surge=0;
   hospitalBld.visible=false; hospitalBld.position.z=200;
@@ -3391,8 +3391,8 @@ function frame(now){
     camLookT.set(0,1.5,-1);
   }
   if(flow==='menu'){
-    camPosT.set(-1.6+Math.sin(elapsed*0.12)*0.7, 2.4+Math.sin(elapsed*0.09)*0.2, 4.6+Math.cos(elapsed*0.1)*0.55);
-    camLookT.set(7.55,4.35,-9.8);
+    camPosT.set(-1.6+Math.sin(elapsed*0.12)*0.9, 2.2+Math.sin(elapsed*0.09)*0.25, 4.6+Math.cos(elapsed*0.1)*0.7);
+    camLookT.set(8.4,4.6,-10);
   }
   var ck=1-Math.exp(-dt*2.5);
   camera.position.lerp(camPosT,ck);
