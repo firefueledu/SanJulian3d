@@ -2974,13 +2974,19 @@ var helmetM=new THREE.MeshStandardMaterial({color:'#F2E8D5',roughness:0.5});
 
 function fig(topM,pantM,skinM,helmet){
   var g=new THREE.Group();
-  var legs=FB(0.34,0.8,0.22,pantM,0,0.4,0); g.add(legs);
+  function limb(w,h,d,m,px,py,pz){
+    var geo=new THREE.BoxGeometry(w,h,d); geo.translate(0,-h/2,0);
+    var o=new THREE.Mesh(geo,m); o.position.set(px,py,pz); return o;
+  }
+  var legL=limb(0.15,0.8,0.2,pantM,-0.1,0.8,0), legR=limb(0.15,0.8,0.2,pantM,0.1,0.8,0);
+  g.add(legL); g.add(legR);
   var torso=FB(0.44,0.62,0.28,topM,0,1.06,0); g.add(torso);
   var head=new THREE.Mesh(new THREE.SphereGeometry(0.14,10,8),skinM); head.position.y=1.54; g.add(head);
-  [-1,1].forEach(function(s){ g.add(FB(0.1,0.55,0.14,topM,s*0.3,1.05,0)); });
+  var armL=limb(0.1,0.55,0.14,topM,-0.3,1.33,0), armR=limb(0.1,0.55,0.14,topM,0.3,1.33,0);
+  g.add(armL); g.add(armR);
   if(helmet){ var h=FC(0.16,0.18,0.12,helmetM,10,0,1.66,0); g.add(h);
     g.add(FB(0.3,0.03,0.3,helmetM,0,1.61,0.02)); }
-  g.userData={legs:legs,torso:torso};
+  g.userData={legs:[legL,legR],arms:[armL,armR],torso:torso};
   return g;
 }
 /* local coords: vignette group origin sits on the street centerline;
@@ -3019,7 +3025,7 @@ scene.add(vig);
 
 /* flow state */
 var flow='cruise';   /* cruise | approach | onScene | parked */
-var vital=0.35, lastScore=null, crewWalk=0, crewKneel=false, surge=0, parkIn=-1;
+var vital=0.35, lastScore=null, crewWalk=0, crewKneel=false, crewDrop=0, surge=0, parkIn=-1;
 var camPos=new THREE.Vector3(), camLook=new THREE.Vector3(-2,1.6,-8);
 var camPosT=new THREE.Vector3(), camLookT=new THREE.Vector3(-2,1.6,-8);
 function setChaseCam(){
@@ -3093,9 +3099,15 @@ var marquee=(function(){
   },768,576);
   var sign=new THREE.Mesh(new THREE.PlaneGeometry(9.8,7.35),new THREE.MeshStandardMaterial({map:sT,roughness:0.9}));
   sign.position.set(8.42,5.4,-10); sign.rotation.y=-Math.PI/2; g.add(sign);
-  /* second sign painted high across the street-facing front of the building */
-  var sign2=new THREE.Mesh(new THREE.PlaneGeometry(8.6,6.45),new THREE.MeshStandardMaterial({map:sT,roughness:0.9}));
-  sign2.position.set(13.5,7.4,-2.92); g.add(sign2);
+  /* rooftop billboard, angled to face the menu camera head-on */
+  var sign2=new THREE.Mesh(new THREE.PlaneGeometry(9.2,6.0),new THREE.MeshStandardMaterial({map:sT,roughness:0.85}));
+  sign2.position.set(13.2,13.6,-9.2); sign2.rotation.y=-0.84; g.add(sign2);
+  var s2back=FB(9.3,6.1,0.16,new THREE.MeshStandardMaterial({color:'#4a4640',roughness:0.9}),0,0,-0.1);
+  sign2.add(s2back);
+  [-3.6,3.6].forEach(function(px){
+    var post=FB(0.22,2.6,0.22,FM.chassis2,px,-2.6,-0.18);
+    sign2.add(post);
+  });
   /* sidewalk dressing in front of the wall: tents, cart, cone */
   function mTent(x,z,rot,col,sc){
     var t=new THREE.Mesh(new THREE.CylinderGeometry(0.02,1.15,1.5,4),new THREE.MeshStandardMaterial({color:col,roughness:0.85}));
@@ -3131,30 +3143,36 @@ var marquee=(function(){
   var can=FC(0.32,0.28,0.85,new THREE.MeshStandardMaterial({color:'#3f5a4a',roughness:0.85}),10,5.9,0.43,0.6);g.add(can);
   var canBag=new THREE.Mesh(new THREE.SphereGeometry(0.3,8,6),bagM);canBag.scale.y=0.7;canBag.position.set(5.9,0.95,0.6);g.add(canBag);
   lit(5.5,0.9,0.9);lit(6.3,0.2,2.2);
-  /* ambient residents — slow, tired, human */
+  /* ambient residents — waypoint paths that weave around the camp, real gaits */
   var peds=[];
-  function walker(lane,z0,z1,spd,ph){
+  function walker(pts,spd,ph){
     var p=fig(civTop,civPant,pSkin,false);
-    p.position.set(lane,0,(z0+z1)/2);
+    p.position.set(pts[0][0],0,pts[0][1]);
     g.add(p);
-    peds.push({g:p,z:(z0+z1)/2,z0:Math.max(z0,z1),z1:Math.min(z0,z1),spd:spd,dir:Math.random()<0.5?1:-1,ph:ph});
-    return p;
+    var pd={g:p,pts:pts,i:0,dir:1,spd:spd,ph:ph,stride:Math.random()*6,h:0,armsLocked:false};
+    peds.push(pd);
+    return pd;
   }
-  var w1=walker(6.0,1.5,-8.5,0.55,0);          /* carrying his bag, like the photo */
+  /* near sidewalk: weaves past the tent, cart, cone and bags, carrying his bag */
+  var w1=walker([[5.2,2.6],[5.3,-0.9],[6.0,-3.0],[5.4,-5.6],[6.1,-7.9]],0.55,0);
   var hb=new THREE.Mesh(new THREE.SphereGeometry(0.2,8,6),bagM);
-  hb.scale.y=0.8;hb.position.set(0.36,0.62,0.12);w1.add(hb);
-  var w2=walker(-8.5,-1.5,-12.0,0.45,2.1);     /* pushing a cart */
+  hb.scale.y=0.8; hb.position.set(0.02,-0.62,0.06);
+  w1.g.userData.arms[1].add(hb);
+  /* far sidewalk: pushes a cart, threading between tarp, tree and tents */
+  var w2=walker([[-7.6,-0.8],[-7.3,-4.6],[-7.9,-8.3],[-7.4,-11.4],[-8.0,-14.3]],0.45,2.1);
+  w2.armsLocked=true;
+  w2.g.userData.arms.forEach(function(a){a.rotation.x=-1.0;});
   var pc=new THREE.Group();
   pc.add(FB(0.7,0.55,1.0,FM.silver,0,0.7,0));
   pc.add(FB(0.65,0.3,0.9,new THREE.MeshStandardMaterial({color:'#3f6a8a',roughness:0.85}),0,1.12,0));
-  pc.position.set(0,0,0.75);w2.add(pc);
-  walker(9.6,-3.0,-12.5,0.5,4.2);              /* far lane, slow */
+  pc.position.set(0,0,0.78); w2.g.add(pc);
+  /* crossing the empty street at an angle */
+  walker([[3.2,-1.2],[0.2,-4.2],[-3.2,-7.4],[-6.2,-10.6]],0.5,4.2);
   /* seated against the wall by the tents */
   var sit=fig(civTop,civPant,pSkin,false);
-  sit.userData.legs.scale.y=0.4;sit.userData.legs.position.y=0.16;
-  sit.userData.torso.position.y=0.62;
-  sit.children.forEach(function(ch){if(ch.geometry&&ch.geometry.type==='SphereGeometry')ch.position.y=1.06;});
-  sit.position.set(8.1,0,-8.6);sit.rotation.y=-1.4;g.add(sit);
+  sit.userData.legs.forEach(function(l){l.rotation.x=1.4;});
+  sit.userData.arms.forEach(function(a){a.rotation.x=0.45;});
+  sit.position.set(8.1,-0.52,-8.6); sit.rotation.y=-1.4; g.add(sit);
   g.userData.peds=peds;
   /* street tree on the far sidewalk, like the photo */
   var trunk=FC(0.14,0.2,3.2,new THREE.MeshStandardMaterial({color:'#5a4632',roughness:0.95}),8,-8.8,1.6,-7); g.add(trunk);
@@ -3175,7 +3193,7 @@ function enterMenu(){
 }
 setVehicle('amb');
 enterMenu();
-camPosT.set(-1.6,2.2,4.6); camLookT.set(8.4,4.6,-10);
+camPosT.set(-1.6,2.2,4.6); camLookT.set(8.4,5.4,-10);
 camPos.copy(camPosT); camLook.copy(camLookT);
 
 /* ---------- engine hooks (non-destructive) ---------- */
@@ -3282,36 +3300,61 @@ function frame(now){
     unit.position.y*=0.9;
   }
 
-  /* menu residents: slow ambling along the sidewalks */
+  /* menu residents: walk the waypoints, step around the camp */
   if(flow==='menu'&&marquee.visible&&marquee.userData.peds){
     var P=marquee.userData.peds;
     for(var pi=0;pi<P.length;pi++){
       var pd=P[pi];
-      pd.z+=pd.dir*pd.spd*dt;
-      if(pd.z<=pd.z1){pd.z=pd.z1;pd.dir=1;}
-      else if(pd.z>=pd.z0){pd.z=pd.z0;pd.dir=-1;}
-      pd.g.position.z=pd.z;
-      pd.g.rotation.y=pd.dir>0?0:Math.PI;
-      pd.g.position.y=Math.abs(Math.sin(elapsed*pd.spd*3.4+pd.ph))*0.04;
-      pd.g.rotation.z=Math.sin(elapsed*pd.spd*3.4+pd.ph)*0.03;
+      var ni=pd.i+pd.dir;
+      if(ni<0||ni>=pd.pts.length){ pd.dir*=-1; ni=pd.i+pd.dir; }
+      var tgt=pd.pts[ni];
+      var dx=tgt[0]-pd.g.position.x, dz2=tgt[1]-pd.g.position.z;
+      var dpt=Math.sqrt(dx*dx+dz2*dz2), step=pd.spd*dt;
+      if(dpt<=step){
+        pd.g.position.x=tgt[0]; pd.g.position.z=tgt[1];
+        pd.i=ni;
+      }else{
+        pd.g.position.x+=dx/dpt*step;
+        pd.g.position.z+=dz2/dpt*step;
+        var hd=Math.atan2(dx,dz2);
+        var dh=Math.atan2(Math.sin(hd-pd.h),Math.cos(hd-pd.h));
+        pd.h+=dh*Math.min(1,dt*4);
+        pd.g.rotation.y=pd.h;
+      }
+      pd.stride+=step*3.6;
+      var sw2=Math.sin(pd.stride+pd.ph)*0.5;
+      pd.g.userData.legs[0].rotation.x=sw2;
+      pd.g.userData.legs[1].rotation.x=-sw2;
+      if(!pd.armsLocked){
+        pd.g.userData.arms[0].rotation.x=-sw2*0.45;
+        pd.g.userData.arms[1].rotation.x=sw2*0.45;
+      }
+      pd.g.position.y=Math.abs(Math.cos(pd.stride+pd.ph))*0.035;
     }
   }
 
   /* vignette: crew + patient react while we're on scene */
   if(vig.visible&&flow==='onScene'){
+    var swing=0;
     if(crewWalk<1){
       crewWalk=Math.min(1,crewWalk+dt*0.55);
       var t2=crewWalk*crewWalk*(3-2*crewWalk);
       crew.position.lerpVectors(CREW_FROM,CREW_TO,t2);
-      crew.position.y=Math.abs(Math.sin(crewWalk*22))*0.05;
+      crew.position.y=Math.abs(Math.cos(crewWalk*22))*0.05;
       crew.rotation.y=0.9-t2*0.55;
+      swing=Math.sin(crewWalk*22)*0.5;
     }else{
       crew.position.y*=0.85;
     }
-    crew.userData.legs.scale.y+=((crewKneel?0.45:1)-crew.userData.legs.scale.y)*Math.min(1,dt*6);
-    crew.userData.legs.position.y=0.4*crew.userData.legs.scale.y;
-    crew.userData.torso.position.y+=((crewKneel?0.72:1.06)-crew.userData.torso.position.y)*Math.min(1,dt*6);
-    crew.userData.torso.rotation.x+=((crewKneel?0.35:0)-crew.userData.torso.rotation.x)*Math.min(1,dt*6);
+    var t6=Math.min(1,dt*6);
+    crewDrop+=((crewKneel?0.34:0)-crewDrop)*t6;
+    crew.position.y-=crewDrop;
+    var CL=crew.userData.legs, CA=crew.userData.arms;
+    CL[0].rotation.x+=((crewKneel?-1.25:swing)-CL[0].rotation.x)*t6;
+    CL[1].rotation.x+=((crewKneel?0.85:-swing)-CL[1].rotation.x)*t6;
+    CA[0].rotation.x+=((crewKneel?0.5:-swing*0.45)-CA[0].rotation.x)*t6;
+    CA[1].rotation.x+=((crewKneel?0.5:swing*0.45)-CA[1].rotation.x)*t6;
+    crew.userData.torso.rotation.x+=((crewKneel?0.35:0)-crew.userData.torso.rotation.x)*t6;
     bystander.rotation.y=2.5+Math.sin(elapsed*0.8)*0.08;
   }
   if(vig.visible){
@@ -3349,7 +3392,7 @@ function frame(now){
   }
   if(flow==='menu'){
     camPosT.set(-1.6+Math.sin(elapsed*0.12)*0.9, 2.2+Math.sin(elapsed*0.09)*0.25, 4.6+Math.cos(elapsed*0.1)*0.7);
-    camLookT.set(8.4,4.6,-10);
+    camLookT.set(8.4,5.4,-10);
   }
   var ck=1-Math.exp(-dt*2.5);
   camera.position.lerp(camPosT,ck);
