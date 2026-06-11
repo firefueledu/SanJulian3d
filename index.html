@@ -128,7 +128,7 @@
   #gameScroll::-webkit-scrollbar{width:8px}
   #gameScroll::-webkit-scrollbar-thumb{background:var(--amber-dim)}
   #gameScroll::-webkit-scrollbar-track{background:transparent}
-  .logo-rig{filter:drop-shadow(0 0 8px rgba(210,167,75,.25))}
+  .logo-rig{max-width:330px;filter:drop-shadow(0 3px 10px rgba(0,0,0,.45));image-rendering:auto}
 </style>
 </head>
 <body>
@@ -1221,46 +1221,31 @@ function newState(cls){
 }
 
 /* ---- LOGO (inline SVG) ---- */
-const LOGO_SVG = `<svg class="logo-rig" viewBox="0 0 120 92" shape-rendering="crispEdges" aria-label="Overview map of the San Julian corridor: three routes from Lincoln Heights down to quarters in Skid Row">
-  <rect x="1" y="1" width="118" height="90" fill="none" stroke="#594d2f" stroke-width="1"/>
-  <text x="60" y="8" text-anchor="middle" font-family="var(--body)" font-size="5" fill="#a08854" letter-spacing="1">THE SAN JULIAN CORRIDOR</text>
-  <text x="112" y="14" text-anchor="middle" font-family="var(--body)" font-size="4" fill="#8d8362">N</text>
-  <rect x="111" y="15" width="2" height="5" fill="#8d8362"/><rect x="110" y="16" width="4" height="1" fill="#8d8362"/>
-  <!-- the 5 freeway band -->
-  <polygon points="93,12 101,12 85,91 77,91" fill="#55505c" opacity="0.55"/>
-  <rect x="88" y="24" width="2" height="4" fill="#8d8362"/><rect x="86" y="40" width="2" height="4" fill="#8d8362"/>
-  <rect x="84" y="56" width="2" height="4" fill="#8d8362"/><rect x="82" y="72" width="2" height="4" fill="#8d8362"/>
-  <text x="103" y="50" font-family="var(--body)" font-size="4" fill="#8d8362">THE 5</text>
-  <!-- routes -->
-  <polyline points="60,19 60,40 58,58 59,76" fill="none" stroke="#d96461" stroke-width="2"/>
-  <polyline points="60,19 45,30 42,50 51,67 59,76" fill="none" stroke="#e0b85a" stroke-width="2"/>
-  <polyline points="60,19 79,27 84,47 74,66 60,76" fill="none" stroke="#9cc07e" stroke-width="2"/>
-  <text x="64" y="36" font-family="var(--body)" font-size="3.6" fill="#d96461">DOWN MAIN</text>
-  <text x="14" y="42" font-family="var(--body)" font-size="3.6" fill="#e0b85a">MISSION &#183; ALAMEDA</text>
-  <text x="60" y="56" font-family="var(--body)" font-size="3.6" fill="#9cc07e">AROUND THE 5</text>
-  <!-- Lincoln Heights start -->
-  <rect x="52" y="12" width="16" height="7" fill="#3c361f" stroke="#a08854" stroke-width="1"/>
-  <text x="60" y="17" text-anchor="middle" font-family="var(--body)" font-size="3.6" fill="#faf5e6">LINCOLN HTS</text>
-  <!-- Golden State General -->
-  <rect x="30" y="44" width="9" height="8" fill="#cfd8d4"/>
-  <rect x="33.5" y="45.5" width="2" height="5" fill="#c94e4b"/><rect x="32" y="47" width="5" height="2" fill="#c94e4b"/>
-  <text x="34" y="57" text-anchor="middle" font-family="var(--body)" font-size="3.4" fill="#a08854">GOLDEN ST GEN</text>
-  <!-- mission -->
-  <rect x="44" y="28" width="6" height="5" fill="#7d4536"/>
-  <text x="40" y="27" font-family="var(--body)" font-size="3.4" fill="#a08854">MISSION</text>
-  <!-- skid row tent cluster -->
-  <rect x="42" y="60" width="34" height="16" fill="none" stroke="#594d2f" stroke-width="0.6" stroke-dasharray="2,2"/>
-  <polygon points="46,72 49,67 52,72" fill="#3f6a8a"/>
-  <polygon points="54,74 57,69 60,74" fill="#c46a3a"/>
-  <polygon points="63,71 66,66 69,71" fill="#4f7a55"/>
-  <polygon points="70,75 72,71 74,75" fill="#6a86c2"/>
-  <text x="59" y="64" text-anchor="middle" font-family="var(--body)" font-size="3.6" fill="#8d8362">SKID ROW</text>
-  <!-- quarters -->
-  <rect x="53" y="77" width="14" height="9" fill="#3c361f" stroke="#c94e4b" stroke-width="1"/>
-  <rect x="57" y="80" width="6" height="6" fill="#c94e4b"/>
-  <rect class="lb-l" x="54" y="75" width="3" height="2" fill="#ff3a3a"/>
-  <rect class="lb-r" x="63" y="75" width="3" height="2" fill="#ff3a3a"/>
-  <text x="60" y="90" text-anchor="middle" font-family="var(--body)" font-size="3.8" fill="#faf5e6">QUARTERS</text>
+const LOGO_SVG = `<svg class="logo-rig" viewBox="0 0 120 78" aria-label="Painted wall mural of a green city-limit sign reading San Julian St">
+  <!-- wall -->
+  <rect x="0" y="0" width="120" height="78" fill="#8d8779"/>
+  <rect x="0" y="0" width="120" height="78" fill="#7c766a" opacity="0.25"/>
+  <rect x="0" y="70" width="120" height="8" fill="#5f5a50" opacity="0.5"/>
+  <rect x="6" y="4" width="2" height="60" fill="#6e695e" opacity="0.4"/>
+  <rect x="112" y="10" width="1.5" height="50" fill="#6e695e" opacity="0.35"/>
+  <!-- sign panel -->
+  <rect x="10" y="5" width="100" height="66" rx="4" fill="#2f7a4a"/>
+  <rect x="13" y="8" width="94" height="60" rx="3" fill="none" stroke="#f5f2e8" stroke-width="2.6"/>
+  <!-- seal roundel -->
+  <circle cx="60" cy="17" r="7.2" fill="#e9da9e" stroke="#caa84e" stroke-width="0.8"/>
+  <rect x="58.7" y="12.4" width="2.6" height="9.2" fill="#c0392b"/>
+  <rect x="55.4" y="15.7" width="9.2" height="2.6" fill="#c0392b"/>
+  <circle cx="60" cy="17" r="5.4" fill="none" stroke="#caa84e" stroke-width="0.5"/>
+  <!-- lettering -->
+  <text x="60" y="42" text-anchor="middle" font-family="'Arial Black',Arial,sans-serif" font-weight="bold" font-size="13.5" fill="#f5f2e8" textLength="88" lengthAdjust="spacingAndGlyphs">San Julian St</text>
+  <text x="60" y="56" text-anchor="middle" font-family="'Arial Black',Arial,sans-serif" font-weight="bold" font-size="9.5" fill="#f5f2e8" textLength="62" lengthAdjust="spacingAndGlyphs">CITY LIMIT</text>
+  <text x="18" y="65" text-anchor="start" font-family="Arial,sans-serif" font-weight="bold" font-size="5.4" fill="#f5f2e8">POP Too Many</text>
+  <text x="102" y="65" text-anchor="end" font-family="Arial,sans-serif" font-weight="bold" font-size="5.4" fill="#f5f2e8">ELEV 2008</text>
+  <!-- weathering -->
+  <rect x="24" y="30" width="6" height="1.2" fill="#244f33" opacity="0.5"/>
+  <rect x="88" y="22" width="4" height="1" fill="#244f33" opacity="0.45"/>
+  <rect x="40" y="60" width="8" height="1" fill="#244f33" opacity="0.4"/>
+  <rect x="14" y="46" width="3" height="6" fill="#8d8779" opacity="0.35"/>
 </svg>`;
 
 /* ---- BOOT / LOADING ---- */

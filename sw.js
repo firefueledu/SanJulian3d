@@ -1,6 +1,6 @@
 // San Julian Trail — network-first service worker
 // Always loads the latest version when online; falls back to cache only when offline.
-const CACHE = 'sjt-v81';
+const CACHE = 'sjt-v82';
 const ASSETS = ['./', './index.html', './manifest.json', './icon.svg', './icon-512.png', './three.min.js'];
 
 self.addEventListener('install', e => {
