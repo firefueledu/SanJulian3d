@@ -2621,17 +2621,74 @@ function makeFacade(side){
   g.position.x=side*14.5;
   return g;
 }
-var FAC_N=13,FAC_SP=17,FAC_LOOP=FAC_N*FAC_SP;
-var rightFacades=[],allFacades=[];
-[-1,1].forEach(function(side){
-  for(var i=0;i<FAC_N;i++){
-    var f=makeFacade(side);
-    f.position.z=20-i*FAC_SP-(side>0?7:0);
-    if(side>0) rightFacades.push(f);
-    allFacades.push(f);
-    addMover(f,FAC_LOOP);
+/* ---- city blocks: flush continuous frontage, a cross-street intersection
+        per block, and civilian cross traffic. No sky gaps. ---- */
+var BLOCK_L=110, BLOCK_N=3, BLOCK_LOOP=BLOCK_L*BLOCK_N;
+var cityModules=[];
+function makeCar(col){
+  var c=new THREE.Group();
+  var bodyM=new THREE.MeshStandardMaterial({color:col,roughness:0.55,metalness:0.25});
+  var b1=box(1.9,0.55,4.2,bodyM); b1.position.y=0.62; c.add(b1);
+  var cab=box(1.7,0.5,2.2,bodyM); cab.position.set(0,1.05,-0.2); c.add(cab);
+  var ws=box(1.6,0.42,0.08,mat.winDark); ws.position.set(0,1.0,0.95); ws.rotation.x=-0.3; c.add(ws);
+  [[-0.85,1.35],[0.85,1.35],[-0.85,-1.35],[0.85,-1.35]].forEach(function(p){
+    var w=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,0.22,10),mat.trim);
+    w.rotation.z=Math.PI/2; w.position.set(p[0],0.3,p[1]); c.add(w);
+  });
+  return c;
+}
+function buildBlock(){
+  var g=new THREE.Group();
+  /* flush building runs down both sides, 0 .. -96 */
+  [-1,1].forEach(function(side){
+    var z=0;
+    while(z>-96){
+      var w=7+Math.random()*6, h=8+Math.random()*10;
+      if(z-w<-96) w=z+96;
+      if(w<3){ z=-96; break; }
+      var body=box(8,h,w,pickA(mat.bricks));
+      body.position.set(side*14.5,h/2,z-w/2); g.add(body);
+      var cap=box(8.3,0.45,w+0.2,mat.trim);
+      cap.position.set(side*14.5,h+0.2,z-w/2); g.add(cap);
+      var faceX=side*14.5+side*-4.05;
+      var rows=Math.max(1,Math.floor(h/3.4)-1),cols=Math.max(1,Math.floor(w/3));
+      for(var r=0;r<rows;r++)for(var c2=0;c2<cols;c2++){
+        var win=box(0.1,1.5,1.1,Math.random()<0.3?mat.winLit:mat.winDark);
+        win.position.set(faceX,2.6+r*3.4,(z-w)+(c2+0.5)*(w/cols));
+        g.add(win);
+      }
+      if(side>0&&Math.random()<0.4){
+        var door=box(0.12,3,3.2,mat.rollup);door.position.set(faceX,1.5,z-w/2);g.add(door);
+      }
+      z-=w;
+    }
+  });
+  /* intersection: cross street punches through the frontage, -96 .. -110 */
+  var cross=box(120,0.05,12,mat.asphalt); cross.position.set(0,0.026,-103); g.add(cross);
+  for(var di=0;di<12;di++){
+    var dsh=box(2.4,0.02,0.22,mat.cream);
+    dsh.position.set(-52+di*9.5,0.06,-103); g.add(dsh);
   }
-});
+  /* cross traffic */
+  var cars=[];
+  var palette=['#7a8087','#5a6e7e','#8a7460','#4e585e'];
+  for(var ci2=0;ci2<3;ci2++){
+    var dir=ci2%2===0?1:-1;
+    var car=makeCar(palette[Math.floor(Math.random()*palette.length)]);
+    car.rotation.y=dir>0?Math.PI/2:-Math.PI/2;
+    car.position.set(-50+Math.random()*100,0,dir>0?-105.6:-100.4);
+    g.add(car);
+    cars.push({o:car,dir:dir,spd:7+Math.random()*4});
+  }
+  g.userData.cars=cars;
+  return g;
+}
+for(var bi=0;bi<BLOCK_N;bi++){
+  var blk=buildBlock();
+  blk.position.z=8-bi*BLOCK_L;
+  cityModules.push(blk);
+  addMover(blk,BLOCK_LOOP);
+}
 
 /* far skyline (slow parallax) */
 var skyliners=[];
@@ -2707,8 +2764,8 @@ addMover(ptA,120);addMover(ptB,120);
   [-12,0,12].forEach(function(zz){[-5.6,5.6].forEach(function(x){
     var p=box(1.6,8.2,1.6,mat.concrete);p.position.set(x,4.1,zz/2);g.add(p);
   });});
-  g.position.z=-160;
-  addMover(g,FAC_LOOP);
+  g.position.z=-160;   /* fixed phase vs city blocks: always mid-block, never on an intersection */
+  addMover(g,BLOCK_LOOP);
 })();
 
 /* hospital prefab — appears for transport reroutes */
@@ -3055,7 +3112,7 @@ function enterBay(){
   flow='bay';
   resetVig();
   marquee.visible=false;
-  for(var fi=0;fi<allFacades.length;fi++) allFacades[fi].visible=true;
+  for(var fi=0;fi<cityModules.length;fi++) cityModules[fi].visible=true;
   for(fi=0;fi<rightProps.length;fi++) rightProps[fi].visible=true;
   for(var k in FLEET){ FLEET[k].visible=true; FLEET[k].position.x=BAY_X[k]; FLEET[k].position.y=0; }
   if(tagEl)tagEl.textContent='QUARTERS \u00b7 APPARATUS BAY \u2014 PICK YOUR SEAT';
@@ -3216,9 +3273,9 @@ function enterMenu(){
   flow='menu';
   resetVig();
   marquee.visible=true;
-  /* menu uses its own continuous street rows: clear all procedural facades,
+  /* menu uses its own continuous street rows: clear the city blocks,
      and right-side props that would poke through the corner building */
-  for(var fi=0;fi<allFacades.length;fi++) allFacades[fi].visible=false;
+  for(var fi=0;fi<cityModules.length;fi++) cityModules[fi].visible=false;
   for(fi=0;fi<rightProps.length;fi++){
     var pz=rightProps[fi].position.z;
     rightProps[fi].visible=!(pz<-1&&pz>-20);
@@ -3270,7 +3327,7 @@ hook('selectScreen',function(){ enterBay(); });
 hook('newState',function(cls){
   exitBay();
   marquee.visible=false;
-  for(var fi=0;fi<allFacades.length;fi++) allFacades[fi].visible=true;
+  for(var fi=0;fi<cityModules.length;fi++) cityModules[fi].visible=true;
   for(fi=0;fi<rightProps.length;fi++) rightProps[fi].visible=true;
   resetVig(); flow='cruise';
   atQuarters=false; outOfService=false; parkIn=-1; surge=0;
@@ -3335,6 +3392,19 @@ function frame(now){
     if(atQuarters&&parkIn<=0&&spd<0.4){ spd=0; setTag('AT QUARTERS'); }
   }else{
     unit.position.y*=0.9;
+  }
+
+  /* cross traffic at the intersections */
+  for(var cmi=0;cmi<cityModules.length;cmi++){
+    var blk2=cityModules[cmi];
+    if(!blk2.visible) continue;
+    var crs=blk2.userData.cars;
+    for(var cj=0;cj<crs.length;cj++){
+      var cr=crs[cj];
+      cr.o.position.x+=cr.dir*cr.spd*dt;
+      if(cr.o.position.x>58)cr.o.position.x=-58;
+      else if(cr.o.position.x<-58)cr.o.position.x=58;
+    }
   }
 
   /* menu residents: walk the waypoints, step around the camp */
