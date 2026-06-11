@@ -128,6 +128,7 @@
   #gameScroll::-webkit-scrollbar{width:8px}
   #gameScroll::-webkit-scrollbar-thumb{background:var(--amber-dim)}
   #gameScroll::-webkit-scrollbar-track{background:transparent}
+  .logo-rig{filter:drop-shadow(0 0 8px rgba(210,167,75,.25))}
 </style>
 </head>
 <body>
@@ -1220,101 +1221,46 @@ function newState(cls){
 }
 
 /* ---- LOGO (inline SVG) ---- */
-const LOGO_SVG = `<svg class="logo-rig" viewBox="0 0 120 58" shape-rendering="crispEdges" aria-label="Rescue ambulance">
-  <!-- ground shadow -->
-  <rect x="6" y="54" width="108" height="1" fill="#3a2c1f" opacity="0.55"/>
-  <!-- lightbar housing on top of cab -->
-  <rect x="74" y="14" width="34" height="2" fill="#1c1710"/>
-  <rect x="74" y="10" width="34" height="4" fill="#1c1710"/>
-  <rect x="74" y="10" width="34" height="1" fill="#3a2c1f"/>
-  <!-- lightbar lenses: 5 red segments, alternating L/R flash -->
-  <rect class="lb-l" x="76" y="11" width="5" height="3" fill="#ff3a3a"/>
-  <rect class="lb-r" x="82" y="11" width="5" height="3" fill="#ff3a3a"/>
-  <rect class="lb-c" x="88" y="11" width="6" height="3" fill="#ff5050"/>
-  <rect class="lb-l" x="95" y="11" width="5" height="3" fill="#ff3a3a"/>
-  <rect class="lb-r" x="101" y="11" width="5" height="3" fill="#ff3a3a"/>
-  <!-- PATIENT BOX (white body) -->
-  <rect x="4" y="16" width="68" height="34" fill="#f3edde"/>
-  <rect x="4" y="16" width="68" height="1" fill="#ffffff"/>
-  <rect x="4" y="49" width="68" height="1" fill="#a8a08a"/>
-  <!-- red waist stripe across box -->
-  <rect x="4" y="28" width="68" height="4" fill="#c94e4b"/>
-  <rect x="4" y="28" width="68" height="1" fill="#e06664"/>
-  <!-- red lower band (chevron area) -->
-  <rect x="4" y="44" width="68" height="6" fill="#c94e4b"/>
-  <rect x="4" y="44" width="68" height="1" fill="#e06664"/>
-  <!-- chevron diagonal stripes on rear panel -->
-  <g fill="#f3edde">
-    <rect x="6" y="46" width="1" height="3"/>
-    <rect x="10" y="46" width="1" height="3"/>
-    <rect x="14" y="46" width="1" height="3"/>
-    <rect x="18" y="46" width="1" height="3"/>
-  </g>
-  <!-- box rear door divider -->
-  <rect x="38" y="17" width="1" height="27" fill="#a8a08a" opacity="0.6"/>
-  <!-- small rear windows -->
-  <rect x="10" y="20" width="10" height="5" fill="#0a1a12"/>
-  <rect x="10" y="20" width="10" height="1" fill="#1a3022"/>
-  <rect x="44" y="20" width="22" height="5" fill="#0a1a12"/>
-  <rect x="44" y="20" width="22" height="1" fill="#1a3022"/>
-  <rect x="46" y="21" width="3" height="1" fill="#3a8a64" opacity="0.5"/>
-  <!-- side flashers on box corners (front and rear) -->
-  <rect class="side-rr" x="5" y="17" width="3" height="3" fill="#ff3a3a"/>
-  <rect class="side-fr" x="68" y="17" width="3" height="3" fill="#ff3a3a"/>
-  <!-- side step under door -->
-  <rect x="36" y="50" width="22" height="2" fill="#1c1710"/>
-  <!-- CAB section (white upper, red lower waist) -->
-  <rect x="72" y="16" width="32" height="34" fill="#f3edde"/>
-  <rect x="72" y="16" width="32" height="1" fill="#ffffff"/>
-  <rect x="72" y="49" width="32" height="1" fill="#a8a08a"/>
-  <!-- cab waist red stripe (continuous with box) -->
-  <rect x="72" y="28" width="32" height="4" fill="#c94e4b"/>
-  <rect x="72" y="28" width="32" height="1" fill="#e06664"/>
-  <!-- cab lower red band -->
-  <rect x="72" y="44" width="32" height="6" fill="#c94e4b"/>
-  <rect x="72" y="44" width="32" height="1" fill="#e06664"/>
-  <!-- windshield -->
-  <rect x="74" y="18" width="26" height="9" fill="#0a1a12"/>
-  <rect x="74" y="18" width="1" height="9" fill="#1a3022"/>
-  <rect x="76" y="19" width="5" height="1" fill="#3a8a64" opacity="0.55"/>
-  <rect x="83" y="19" width="3" height="1" fill="#3a8a64" opacity="0.35"/>
-  <!-- A-pillar -->
-  <rect x="100" y="18" width="1" height="9" fill="#a8a08a"/>
-  <!-- cab side door window -->
-  <rect x="74" y="33" width="14" height="6" fill="#0a1a12"/>
-  <rect x="74" y="33" width="14" height="1" fill="#1a3022"/>
-  <!-- door handle -->
-  <rect x="76" y="41" width="5" height="1" fill="#3a2c1f"/>
-  <!-- side mirror -->
-  <rect x="104" y="20" width="3" height="6" fill="#1c1710"/>
-  <rect x="104" y="20" width="3" height="1" fill="#3a2c1f"/>
-  <!-- front grille -->
-  <rect x="101" y="33" width="8" height="8" fill="#1c1710"/>
-  <rect x="102" y="34" width="6" height="1" fill="#3a2c1f"/>
-  <rect x="102" y="36" width="6" height="1" fill="#3a2c1f"/>
-  <rect x="102" y="38" width="6" height="1" fill="#3a2c1f"/>
-  <rect x="102" y="40" width="6" height="1" fill="#3a2c1f"/>
-  <!-- headlights -->
-  <rect class="head-l" x="105" y="29" width="5" height="3" fill="#ffe9a8"/>
-  <rect x="105" y="29" width="5" height="1" fill="#ffffff"/>
-  <!-- front bumper -->
-  <rect x="100" y="48" width="12" height="3" fill="#1c1710"/>
-  <rect x="100" y="48" width="12" height="1" fill="#3a2c1f"/>
-  <!-- WHEELS -->
-  <g fill="#0a0a0a">
-    <rect x="12" y="49" width="18" height="6"/>
-    <rect x="13" y="48" width="16" height="1"/>
-    <rect x="12" y="55" width="18" height="1"/>
-  </g>
-  <rect x="17" y="51" width="8" height="3" fill="#3a2c1f"/>
-  <rect x="19" y="52" width="4" height="1" fill="#a8a08a"/>
-  <g fill="#0a0a0a">
-    <rect x="80" y="49" width="18" height="6"/>
-    <rect x="81" y="48" width="16" height="1"/>
-    <rect x="80" y="55" width="18" height="1"/>
-  </g>
-  <rect x="85" y="51" width="8" height="3" fill="#3a2c1f"/>
-  <rect x="87" y="52" width="4" height="1" fill="#a8a08a"/>
+const LOGO_SVG = `<svg class="logo-rig" viewBox="0 0 120 92" shape-rendering="crispEdges" aria-label="Overview map of the San Julian corridor: three routes from Lincoln Heights down to quarters in Skid Row">
+  <rect x="1" y="1" width="118" height="90" fill="none" stroke="#594d2f" stroke-width="1"/>
+  <text x="60" y="8" text-anchor="middle" font-family="var(--body)" font-size="5" fill="#a08854" letter-spacing="1">THE SAN JULIAN CORRIDOR</text>
+  <text x="112" y="14" text-anchor="middle" font-family="var(--body)" font-size="4" fill="#8d8362">N</text>
+  <rect x="111" y="15" width="2" height="5" fill="#8d8362"/><rect x="110" y="16" width="4" height="1" fill="#8d8362"/>
+  <!-- the 5 freeway band -->
+  <polygon points="93,12 101,12 85,91 77,91" fill="#55505c" opacity="0.55"/>
+  <rect x="88" y="24" width="2" height="4" fill="#8d8362"/><rect x="86" y="40" width="2" height="4" fill="#8d8362"/>
+  <rect x="84" y="56" width="2" height="4" fill="#8d8362"/><rect x="82" y="72" width="2" height="4" fill="#8d8362"/>
+  <text x="103" y="50" font-family="var(--body)" font-size="4" fill="#8d8362">THE 5</text>
+  <!-- routes -->
+  <polyline points="60,19 60,40 58,58 59,76" fill="none" stroke="#d96461" stroke-width="2"/>
+  <polyline points="60,19 45,30 42,50 51,67 59,76" fill="none" stroke="#e0b85a" stroke-width="2"/>
+  <polyline points="60,19 79,27 84,47 74,66 60,76" fill="none" stroke="#9cc07e" stroke-width="2"/>
+  <text x="64" y="36" font-family="var(--body)" font-size="3.6" fill="#d96461">DOWN MAIN</text>
+  <text x="14" y="42" font-family="var(--body)" font-size="3.6" fill="#e0b85a">MISSION &#183; ALAMEDA</text>
+  <text x="60" y="56" font-family="var(--body)" font-size="3.6" fill="#9cc07e">AROUND THE 5</text>
+  <!-- Lincoln Heights start -->
+  <rect x="52" y="12" width="16" height="7" fill="#3c361f" stroke="#a08854" stroke-width="1"/>
+  <text x="60" y="17" text-anchor="middle" font-family="var(--body)" font-size="3.6" fill="#faf5e6">LINCOLN HTS</text>
+  <!-- Golden State General -->
+  <rect x="30" y="44" width="9" height="8" fill="#cfd8d4"/>
+  <rect x="33.5" y="45.5" width="2" height="5" fill="#c94e4b"/><rect x="32" y="47" width="5" height="2" fill="#c94e4b"/>
+  <text x="34" y="57" text-anchor="middle" font-family="var(--body)" font-size="3.4" fill="#a08854">GOLDEN ST GEN</text>
+  <!-- mission -->
+  <rect x="44" y="28" width="6" height="5" fill="#7d4536"/>
+  <text x="40" y="27" font-family="var(--body)" font-size="3.4" fill="#a08854">MISSION</text>
+  <!-- skid row tent cluster -->
+  <rect x="42" y="60" width="34" height="16" fill="none" stroke="#594d2f" stroke-width="0.6" stroke-dasharray="2,2"/>
+  <polygon points="46,72 49,67 52,72" fill="#3f6a8a"/>
+  <polygon points="54,74 57,69 60,74" fill="#c46a3a"/>
+  <polygon points="63,71 66,66 69,71" fill="#4f7a55"/>
+  <polygon points="70,75 72,71 74,75" fill="#6a86c2"/>
+  <text x="59" y="64" text-anchor="middle" font-family="var(--body)" font-size="3.6" fill="#8d8362">SKID ROW</text>
+  <!-- quarters -->
+  <rect x="53" y="77" width="14" height="9" fill="#3c361f" stroke="#c94e4b" stroke-width="1"/>
+  <rect x="57" y="80" width="6" height="6" fill="#c94e4b"/>
+  <rect class="lb-l" x="54" y="75" width="3" height="2" fill="#ff3a3a"/>
+  <rect class="lb-r" x="63" y="75" width="3" height="2" fill="#ff3a3a"/>
+  <text x="60" y="90" text-anchor="middle" font-family="var(--body)" font-size="3.8" fill="#faf5e6">QUARTERS</text>
 </svg>`;
 
 /* ---- BOOT / LOADING ---- */
